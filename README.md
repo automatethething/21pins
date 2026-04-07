@@ -64,6 +64,19 @@ Canonical provider names are:
 
 Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`).
 
+### Optional: rotate keys safely
+
+```bash
+./21pins key rotate start openai --value "$NEW_OPENAI_API_KEY"
+./21pins key rotate verify openai
+./21pins key rotate commit openai --keep-previous-hours 24
+# later, once stable:
+./21pins key revoke openai --previous
+```
+
+Default behavior keeps the previous key for a grace window so rollback is possible.
+Use `--keep-previous-hours 0` for immediate old-key revocation.
+
 ### 2) Create an app token
 
 ```bash
@@ -187,6 +200,13 @@ status
 key providers
 key set <provider> --value <apiKey>
 key list
+key history <provider>
+key rotate start <provider> --value <apiKey>
+key rotate verify <provider>
+key rotate commit <provider> [--keep-previous-hours 24]
+key rotate rollback <provider>
+key revoke <provider> --previous
+key revoke <provider> --key-id <id>
 token create <name> [--scopes proxy:chat,proxy:providers]
 token list
 token revoke <token>

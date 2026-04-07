@@ -61,6 +61,13 @@ Commands:
   key providers
   key set <provider> --value <apiKey>
   key list
+  key history <provider>
+  key rotate start <provider> --value <apiKey>
+  key rotate verify <provider>
+  key rotate commit <provider> [--keep-previous-hours 24]
+  key rotate rollback <provider>
+  key revoke <provider> --previous
+  key revoke <provider> --key-id <id>
   token create <name> [--scopes proxy:chat,proxy:providers]
   token list
   token revoke <token>
@@ -92,7 +99,7 @@ func handleStatus(st *store.Store) {
 
 func handleKey(st *store.Store, args []string) {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "key subcommand required: providers|set|list")
+		fmt.Fprintln(os.Stderr, "key subcommand required: providers|set|list|history|rotate|revoke")
 		os.Exit(1)
 	}
 	switch args[0] {
@@ -147,6 +154,118 @@ func handleKey(st *store.Store, args []string) {
 		for _, p := range providers {
 			fmt.Println(p)
 		}
+	case "history":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: key history <provider>")
+			os.Exit(1)
+		}
+		provider, _ := store.CanonicalProvider(args[1])
+		history := st.ProviderKeyHistory(provider)
+		if len(history) == 0 {
+			fmt.Println("No key history for provider.")
+			return
+		}
+		for _, rec := range history {
+			exp := ""
+			if rec.ExpiresAt != "" {
+				exp = " expires=" + rec.ExpiresAt
+			}
+			fmt.Printf("%s  status=%s  created=%s%s\n", rec.ID, rec.Status, rec.CreatedAt, exp)
+		}
+	case "rotate":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: key rotate <start|verify|commit|rollback> ...")
+			os.Exit(1)
+		}
+		switch args[1] {
+		case "start":
+			if len(args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: key rotate start <provider> --value <apiKey>")
+				os.Exit(1)
+			}
+			provider, _ := store.CanonicalProvider(args[2])
+			fs := flag.NewFlagSet("key rotate start", flag.ExitOnError)
+			value := fs.String("value", "", "new provider API key")
+			_ = fs.Parse(args[3:])
+			if *value == "" {
+				fmt.Fprintln(os.Stderr, "--value is required")
+				os.Exit(1)
+			}
+			id, err := st.RotateProviderKeyStart(provider, *value)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "rotate start failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Rotation started for %s. pending_key_id=%s\n", provider, id)
+			fmt.Println("Next: key rotate verify <provider>")
+		case "verify":
+			if len(args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: key rotate verify <provider>")
+				os.Exit(1)
+			}
+			provider, _ := store.CanonicalProvider(args[2])
+			id, err := st.RotateProviderKeyVerify(provider)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "rotate verify failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Pending key verified for %s. pending_key_id=%s\n", provider, id)
+		case "commit":
+			if len(args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: key rotate commit <provider> [--keep-previous-hours 24]")
+				os.Exit(1)
+			}
+			provider, _ := store.CanonicalProvider(args[2])
+			fs := flag.NewFlagSet("key rotate commit", flag.ExitOnError)
+			keep := fs.Int("keep-previous-hours", 24, "grace window for previous key")
+			_ = fs.Parse(args[3:])
+			if err := st.RotateProviderKeyCommit(provider, *keep); err != nil {
+				fmt.Fprintf(os.Stderr, "rotate commit failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Rotation committed for %s. previous key grace window: %dh\n", provider, *keep)
+		case "rollback":
+			if len(args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: key rotate rollback <provider>")
+				os.Exit(1)
+			}
+			provider, _ := store.CanonicalProvider(args[2])
+			if err := st.RotateProviderKeyRollback(provider); err != nil {
+				fmt.Fprintf(os.Stderr, "rotate rollback failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Rollback complete for %s. Previous key is active again.\n", provider)
+		default:
+			fmt.Fprintln(os.Stderr, "unknown key rotate subcommand")
+			os.Exit(1)
+		}
+	case "revoke":
+		if len(args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: key revoke <provider> --previous | --key-id <id>")
+			os.Exit(1)
+		}
+		provider, _ := store.CanonicalProvider(args[1])
+		fs := flag.NewFlagSet("key revoke", flag.ExitOnError)
+		previous := fs.Bool("previous", false, "revoke previous key")
+		keyID := fs.String("key-id", "", "specific key id to revoke")
+		_ = fs.Parse(args[2:])
+		if *previous {
+			if err := st.RevokePreviousProviderKey(provider); err != nil {
+				fmt.Fprintf(os.Stderr, "revoke previous failed: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Previous key revoked for %s.\n", provider)
+			return
+		}
+		if strings.TrimSpace(*keyID) == "" {
+			fmt.Fprintln(os.Stderr, "--key-id required (or use --previous)")
+			os.Exit(1)
+		}
+		if err := st.RevokeProviderKey(provider, *keyID); err != nil {
+			fmt.Fprintf(os.Stderr, "revoke key failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Key %s revoked for %s.\n", *keyID, provider)
 	default:
 		fmt.Fprintln(os.Stderr, "unknown key subcommand")
 		os.Exit(1)

@@ -18,13 +18,38 @@ import (
 )
 
 type State struct {
-	ProviderKeys map[string]string        `json:"provider_keys"`
-	Tokens       []TokenRecord            `json:"tokens"`
-	Grants       []policy.Grant           `json:"grants,omitempty"`
-	Receipts     []policy.Receipt         `json:"receipts,omitempty"`
-	Approvals    []policy.ApprovalRequest `json:"approvals,omitempty"`
-	SigningKeys  SigningKeys              `json:"signing_keys,omitempty"`
+	ProviderKeys    map[string]string         `json:"provider_keys"`
+	ProviderKeySets map[string]ProviderKeySet `json:"provider_keysets,omitempty"`
+	Tokens          []TokenRecord             `json:"tokens"`
+	Grants          []policy.Grant            `json:"grants,omitempty"`
+	Receipts        []policy.Receipt          `json:"receipts,omitempty"`
+	Approvals       []policy.ApprovalRequest  `json:"approvals,omitempty"`
+	SigningKeys     SigningKeys               `json:"signing_keys,omitempty"`
 }
+
+type ProviderKeySet struct {
+	ActiveKeyID   string              `json:"active_key_id,omitempty"`
+	PendingKeyID  string              `json:"pending_key_id,omitempty"`
+	PreviousKeyID string              `json:"previous_key_id,omitempty"`
+	Keys          []ProviderKeyRecord `json:"keys,omitempty"`
+}
+
+type ProviderKeyRecord struct {
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+	Secret    string `json:"secret"`
+	CreatedAt string `json:"created_at"`
+	VerifiedAt string `json:"verified_at,omitempty"`
+	RevokedAt string `json:"revoked_at,omitempty"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+const (
+	KeyStatusActive   = "active"
+	KeyStatusPending  = "pending"
+	KeyStatusPrevious = "previous"
+	KeyStatusRevoked  = "revoked"
+)
 
 type TokenRecord struct {
 	Name       string   `json:"name"`
@@ -59,7 +84,7 @@ func (s *Store) loadOrInit() error {
 
 	_, err := os.Stat(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		s.state = State{ProviderKeys: map[string]string{}, Tokens: []TokenRecord{}}
+		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, Tokens: []TokenRecord{}}
 		return s.saveLocked()
 	}
 	if err != nil {
@@ -72,7 +97,7 @@ func (s *Store) loadOrInit() error {
 	}
 
 	if len(b) == 0 {
-		s.state = State{ProviderKeys: map[string]string{}, Tokens: []TokenRecord{}}
+		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, Tokens: []TokenRecord{}}
 		return s.saveLocked()
 	}
 
@@ -81,6 +106,9 @@ func (s *Store) loadOrInit() error {
 	}
 	if s.state.ProviderKeys == nil {
 		s.state.ProviderKeys = map[string]string{}
+	}
+	if s.state.ProviderKeySets == nil {
+		s.state.ProviderKeySets = map[string]ProviderKeySet{}
 	}
 	if s.state.Tokens == nil {
 		s.state.Tokens = []TokenRecord{}
@@ -94,7 +122,43 @@ func (s *Store) loadOrInit() error {
 	if s.state.Approvals == nil {
 		s.state.Approvals = []policy.ApprovalRequest{}
 	}
+
+	changed := s.migrateProviderKeysLocked()
+	if changed {
+		return s.saveLocked()
+	}
 	return nil
+}
+
+func (s *Store) migrateProviderKeysLocked() bool {
+	changed := false
+	for provider, key := range s.state.ProviderKeys {
+		if strings.TrimSpace(key) == "" {
+			delete(s.state.ProviderKeys, provider)
+			changed = true
+			continue
+		}
+		if _, ok := s.state.ProviderKeySets[provider]; ok {
+			continue
+		}
+		now := time.Now().UTC().Format(time.RFC3339)
+		rec := ProviderKeyRecord{
+			ID:         generateKeyID(),
+			Status:     KeyStatusActive,
+			Secret:     key,
+			CreatedAt:  now,
+			VerifiedAt: now,
+		}
+		s.state.ProviderKeySets[provider] = ProviderKeySet{
+			ActiveKeyID: rec.ID,
+			Keys:        []ProviderKeyRecord{rec},
+		}
+		changed = true
+	}
+	for provider := range s.state.ProviderKeySets {
+		s.syncActiveProviderKeyLocked(provider)
+	}
+	return changed
 }
 
 func (s *Store) saveLocked() error {
@@ -110,30 +174,305 @@ func (s *Store) saveLocked() error {
 
 func (s *Store) SetProviderKey(provider, key string) error {
 	provider = normalizeProvider(provider)
-	if provider == "" || strings.TrimSpace(key) == "" {
+	key = strings.TrimSpace(key)
+	if provider == "" || key == "" {
 		return errors.New("provider and key are required")
 	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.state.ProviderKeys[provider] = strings.TrimSpace(key)
+
+	ks := s.ensureProviderKeySetLocked(provider)
+	for i := range ks.Keys {
+		if ks.Keys[i].Status == KeyStatusActive || ks.Keys[i].Status == KeyStatusPending || ks.Keys[i].Status == KeyStatusPrevious {
+			ks.Keys[i].Status = KeyStatusRevoked
+			if ks.Keys[i].RevokedAt == "" {
+				ks.Keys[i].RevokedAt = now
+			}
+		}
+	}
+	rec := ProviderKeyRecord{ID: generateKeyID(), Status: KeyStatusActive, Secret: key, CreatedAt: now, VerifiedAt: now}
+	ks.Keys = append(ks.Keys, rec)
+	ks.ActiveKeyID = rec.ID
+	ks.PendingKeyID = ""
+	ks.PreviousKeyID = ""
+	s.state.ProviderKeySets[provider] = ks
+	s.syncActiveProviderKeyLocked(provider)
 	return s.saveLocked()
 }
 
-func (s *Store) GetProviderKey(provider string) string {
+func (s *Store) RotateProviderKeyStart(provider, newKey string) (string, error) {
+	provider = normalizeProvider(provider)
+	newKey = strings.TrimSpace(newKey)
+	if provider == "" || newKey == "" {
+		return "", errors.New("provider and key are required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.state.ProviderKeys[normalizeProvider(provider)]
+	ks := s.ensureProviderKeySetLocked(provider)
+	if ks.PendingKeyID != "" {
+		return "", errors.New("rotation already in progress; commit or rollback first")
+	}
+	rec := ProviderKeyRecord{ID: generateKeyID(), Status: KeyStatusPending, Secret: newKey, CreatedAt: now}
+	ks.Keys = append(ks.Keys, rec)
+	ks.PendingKeyID = rec.ID
+	s.state.ProviderKeySets[provider] = ks
+	return rec.ID, s.saveLocked()
+}
+
+func (s *Store) RotateProviderKeyVerify(provider string) (string, error) {
+	provider = normalizeProvider(provider)
+	if provider == "" {
+		return "", errors.New("provider is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok || ks.PendingKeyID == "" {
+		return "", errors.New("no pending key rotation for provider")
+	}
+	idx := findProviderKeyIndex(ks.Keys, ks.PendingKeyID)
+	if idx < 0 {
+		return "", errors.New("pending key not found")
+	}
+	ks.Keys[idx].VerifiedAt = now
+	s.state.ProviderKeySets[provider] = ks
+	return ks.PendingKeyID, s.saveLocked()
+}
+
+func (s *Store) RotateProviderKeyCommit(provider string, keepPreviousHours int) error {
+	provider = normalizeProvider(provider)
+	if provider == "" {
+		return errors.New("provider is required")
+	}
+	if keepPreviousHours < 0 {
+		return errors.New("keep-previous-hours must be >= 0")
+	}
+	now := time.Now().UTC()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok || ks.PendingKeyID == "" {
+		return errors.New("no pending key rotation for provider")
+	}
+	pendingIdx := findProviderKeyIndex(ks.Keys, ks.PendingKeyID)
+	if pendingIdx < 0 {
+		return errors.New("pending key not found")
+	}
+	if strings.TrimSpace(ks.Keys[pendingIdx].VerifiedAt) == "" {
+		return errors.New("pending key must be verified before commit")
+	}
+
+	if ks.ActiveKeyID != "" {
+		activeIdx := findProviderKeyIndex(ks.Keys, ks.ActiveKeyID)
+		if activeIdx >= 0 {
+			if keepPreviousHours == 0 {
+				ks.Keys[activeIdx].Status = KeyStatusRevoked
+				ks.Keys[activeIdx].RevokedAt = now.Format(time.RFC3339)
+				ks.Keys[activeIdx].ExpiresAt = ""
+				ks.PreviousKeyID = ""
+			} else {
+				ks.Keys[activeIdx].Status = KeyStatusPrevious
+				ks.Keys[activeIdx].ExpiresAt = now.Add(time.Duration(keepPreviousHours) * time.Hour).Format(time.RFC3339)
+				ks.PreviousKeyID = ks.Keys[activeIdx].ID
+			}
+		}
+	}
+
+	ks.Keys[pendingIdx].Status = KeyStatusActive
+	ks.Keys[pendingIdx].ExpiresAt = ""
+	ks.Keys[pendingIdx].RevokedAt = ""
+	ks.ActiveKeyID = ks.Keys[pendingIdx].ID
+	ks.PendingKeyID = ""
+
+	s.state.ProviderKeySets[provider] = ks
+	s.syncActiveProviderKeyLocked(provider)
+	return s.saveLocked()
+}
+
+func (s *Store) RotateProviderKeyRollback(provider string) error {
+	provider = normalizeProvider(provider)
+	if provider == "" {
+		return errors.New("provider is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok || ks.PreviousKeyID == "" {
+		return errors.New("no previous key available for rollback")
+	}
+	prevIdx := findProviderKeyIndex(ks.Keys, ks.PreviousKeyID)
+	activeIdx := findProviderKeyIndex(ks.Keys, ks.ActiveKeyID)
+	if prevIdx < 0 || activeIdx < 0 {
+		return errors.New("rollback keys not found")
+	}
+	ks.Keys[activeIdx].Status = KeyStatusPrevious
+	ks.Keys[activeIdx].ExpiresAt = now
+	ks.Keys[prevIdx].Status = KeyStatusActive
+	ks.Keys[prevIdx].ExpiresAt = ""
+
+	ks.ActiveKeyID, ks.PreviousKeyID = ks.PreviousKeyID, ks.ActiveKeyID
+	s.state.ProviderKeySets[provider] = ks
+	s.syncActiveProviderKeyLocked(provider)
+	return s.saveLocked()
+}
+
+func (s *Store) RevokePreviousProviderKey(provider string) error {
+	provider = normalizeProvider(provider)
+	if provider == "" {
+		return errors.New("provider is required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok || ks.PreviousKeyID == "" {
+		return errors.New("no previous key to revoke")
+	}
+	idx := findProviderKeyIndex(ks.Keys, ks.PreviousKeyID)
+	if idx < 0 {
+		return errors.New("previous key not found")
+	}
+	ks.Keys[idx].Status = KeyStatusRevoked
+	ks.Keys[idx].RevokedAt = now
+	ks.Keys[idx].ExpiresAt = ""
+	ks.PreviousKeyID = ""
+	s.state.ProviderKeySets[provider] = ks
+	return s.saveLocked()
+}
+
+func (s *Store) RevokeProviderKey(provider, keyID string) error {
+	provider = normalizeProvider(provider)
+	keyID = strings.TrimSpace(keyID)
+	if provider == "" || keyID == "" {
+		return errors.New("provider and key-id are required")
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok {
+		return errors.New("provider not found")
+	}
+	if ks.ActiveKeyID == keyID {
+		return errors.New("cannot revoke active key")
+	}
+	idx := findProviderKeyIndex(ks.Keys, keyID)
+	if idx < 0 {
+		return errors.New("key-id not found")
+	}
+	ks.Keys[idx].Status = KeyStatusRevoked
+	ks.Keys[idx].RevokedAt = now
+	ks.Keys[idx].ExpiresAt = ""
+	if ks.PendingKeyID == keyID {
+		ks.PendingKeyID = ""
+	}
+	if ks.PreviousKeyID == keyID {
+		ks.PreviousKeyID = ""
+	}
+	s.state.ProviderKeySets[provider] = ks
+	return s.saveLocked()
+}
+
+func (s *Store) ProviderKeyHistory(provider string) []ProviderKeyRecord {
+	provider = normalizeProvider(provider)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok {
+		return []ProviderKeyRecord{}
+	}
+	out := make([]ProviderKeyRecord, len(ks.Keys))
+	copy(out, ks.Keys)
+	slices.SortFunc(out, func(a, b ProviderKeyRecord) int {
+		return strings.Compare(b.CreatedAt, a.CreatedAt)
+	})
+	return out
+}
+
+func (s *Store) GetProviderKey(provider string) string {
+	provider = normalizeProvider(provider)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ks, ok := s.state.ProviderKeySets[provider]; ok && ks.ActiveKeyID != "" {
+		if idx := findProviderKeyIndex(ks.Keys, ks.ActiveKeyID); idx >= 0 {
+			return ks.Keys[idx].Secret
+		}
+	}
+	return s.state.ProviderKeys[provider]
 }
 
 func (s *Store) ListProviders() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	providers := make([]string, 0, len(s.state.ProviderKeys))
+	set := map[string]struct{}{}
 	for p := range s.state.ProviderKeys {
+		set[p] = struct{}{}
+	}
+	for p, ks := range s.state.ProviderKeySets {
+		if ks.ActiveKeyID != "" {
+			set[p] = struct{}{}
+		}
+	}
+	providers := make([]string, 0, len(set))
+	for p := range set {
 		providers = append(providers, p)
 	}
 	slices.Sort(providers)
 	return providers
+}
+
+func (s *Store) ensureProviderKeySetLocked(provider string) ProviderKeySet {
+	if ks, ok := s.state.ProviderKeySets[provider]; ok {
+		if ks.Keys == nil {
+			ks.Keys = []ProviderKeyRecord{}
+		}
+		return ks
+	}
+	return ProviderKeySet{Keys: []ProviderKeyRecord{}}
+}
+
+func (s *Store) syncActiveProviderKeyLocked(provider string) {
+	ks, ok := s.state.ProviderKeySets[provider]
+	if !ok {
+		delete(s.state.ProviderKeys, provider)
+		return
+	}
+	if ks.ActiveKeyID == "" {
+		delete(s.state.ProviderKeys, provider)
+		return
+	}
+	idx := findProviderKeyIndex(ks.Keys, ks.ActiveKeyID)
+	if idx < 0 {
+		delete(s.state.ProviderKeys, provider)
+		return
+	}
+	s.state.ProviderKeys[provider] = ks.Keys[idx].Secret
+}
+
+func findProviderKeyIndex(keys []ProviderKeyRecord, id string) int {
+	for i := range keys {
+		if keys[i].ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func generateKeyID() string {
+	buf := make([]byte, 8)
+	_, _ = rand.Read(buf)
+	return "key_" + hex.EncodeToString(buf)
 }
 
 func (s *Store) CreateToken(name string, scopes []string) (string, error) {
