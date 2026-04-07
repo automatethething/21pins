@@ -49,6 +49,7 @@ func NewServer(st *store.Store, cfg Config) *Server {
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/v1/chat/completions", s.withCORS(s.withAuth("proxy:chat", s.handleOpenAICompatChat)))
 	mux.HandleFunc("/v1/providers/", s.withCORS(s.withAuth("proxy:providers", s.handleProviderPassthrough)))
+	mux.HandleFunc("/", s.handleRoot)
 	s.handler = s.withCORSHandler(mux)
 	return s
 }
@@ -94,6 +95,27 @@ func (s *Server) withCORSHandler(next http.Handler) http.Handler {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"service": "21pins gateway",
+		"status":  "ok",
+		"endpoints": map[string]any{
+			"health":                    "GET /health",
+			"openai_compatible_chat":    "POST /v1/chat/completions",
+			"provider_passthrough":      "ANY /v1/providers/{provider}/{path}",
+			"auth_header":               "Authorization: Bearer <21pins-token>",
+			"required_scopes": map[string]string{
+				"/v1/chat/completions": "proxy:chat",
+				"/v1/providers/*":      "proxy:providers",
+			},
+		},
+	})
 }
 
 func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) {
