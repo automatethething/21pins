@@ -250,10 +250,19 @@
       background: oklch(25% 0.03 250);
       border: 1px solid oklch(32% 0.025 250);
       border-radius: 4px;
-      padding: 0.3rem 0.65rem;
-      font-size: 0.78rem;
+      padding: 0.28rem 0.6rem;
+      font-size: 0.76rem;
       font-family: var(--font-mono);
       color: oklch(80% 0.015 250);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .app-chip img {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
     }
     .diagram-arrow {
       text-align: center;
@@ -932,7 +941,7 @@
       <a href="#how-it-works">How it works</a>
       <a href="#pins">7 pins</a>
       <a href="#quickstart">Quickstart</a>
-      <a href="#quickstart" class="nav-cta">Start now →</a>
+      <a href="https://git.consentkeys.com/kris/21pins" class="nav-cta">Repo →</a>
     </div>
   </div>
 </nav>
@@ -971,10 +980,11 @@
       <div class="diagram-card">
         <div class="diagram-label">Your AI tools</div>
         <div class="diagram-apps">
-          <span class="app-chip">founder-engine</span>
-          <span class="app-chip">adversarial</span>
-          <span class="app-chip">your-app</span>
-          <span class="app-chip">agent-X</span>
+          <span class="app-chip"><img src="https://icons.duckduckgo.com/ip3/openclaw.ai.ico" alt="OpenClaw icon">OpenClaw</span>
+          <span class="app-chip"><img src="https://icons.duckduckgo.com/ip3/kilocode.ai.ico" alt="Kilo Code icon">Kilo Code</span>
+          <span class="app-chip"><img src="https://icons.duckduckgo.com/ip3/github.com.ico" alt="Roo Code icon">Roo Code</span>
+          <span class="app-chip"><img src="https://icons.duckduckgo.com/ip3/hermes-agent.nousresearch.com.ico" alt="Hermes Agent icon">Hermes Agent</span>
+          <span class="app-chip"><img src="https://icons.duckduckgo.com/ip3/cline.bot.ico" alt="Cline icon">Cline</span>
         </div>
         <div class="diagram-arrow">↓ ↓ ↓ ↓</div>
         <div class="diagram-gateway">
@@ -1098,7 +1108,7 @@
           Revoke at any time.
         </p>
         <div class="step-code">
-          <span class="cmd">21pins</span> token create <span class="arg">founder-engine</span> \<br>
+          <span class="cmd">21pins</span> token create <span class="arg">my-agent-app</span> \<br>
           &nbsp;&nbsp;<span class="flag">--scopes</span> <span class="arg">proxy:chat,proxy:providers</span><br>
           <br>
           <span class="c-output"># Token issued once. Copy it now.</span>
@@ -1209,7 +1219,8 @@
       </div>
       <div class="code-body">
 <span class="c-comment"># 1. Build</span>
-<span class="c-prompt">$ </span><span class="c-cmd">go build -o 21pins ./cmd/21pins</span>
+<span class="c-prompt">$ </span><span class="c-cmd">git clone https://git.consentkeys.com/kris/21pins.git</span>
+<span class="c-prompt">$ </span><span class="c-cmd">cd 21pins && go build -o 21pins ./cmd/21pins</span>
 <span class="c-blank"></span>
 <span class="c-comment"># 2. Init</span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins init</span>
@@ -1320,7 +1331,7 @@
         </div>
       </div>
       <div class="install-links">
-        <a href="#how-it-works" class="install-link">How it works</a>
+        <a href="https://git.consentkeys.com/kris/21pins" class="install-link">View repo</a>
         <a href="#quickstart" class="install-link">↑ Full quickstart</a>
       </div>
     </div>
@@ -1336,7 +1347,7 @@
       <span>A <a href="https://petrichorlabs.ca" style="color:inherit;text-decoration:underline;text-underline-offset:2px;">Petrichor Labs</a> project</span>
     </div>
     <div class="footer-links">
-      <a href="#how-it-works">How it works</a>
+      <a href="https://git.consentkeys.com/kris/21pins">Repository</a>
       <a href="#quickstart">Quickstart</a>
     </div>
   </div>
