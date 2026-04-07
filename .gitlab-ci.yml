@@ -1,0 +1,18 @@
+stages:
+  - deploy
+
+variables:
+  VERCEL_ORG_ID: "team_ueq8UgHFUGDz3klpYrhu0ETr"
+  VERCEL_PROJECT_ID: "prj_4wWufcgBnYrmrANNzKWptugt0F0E"
+
+deploy_production:
+  stage: deploy
+  image: node:20-alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  before_script:
+    - npm i -g vercel@latest
+  script:
+    - cd website
+    - vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+    - vercel deploy --prod --yes --token="$VERCEL_TOKEN"
