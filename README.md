@@ -77,6 +77,16 @@ Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `op
 Default behavior keeps the previous key for a grace window so rollback is possible.
 Use `--keep-previous-hours 0` for immediate old-key revocation.
 
+### Optional: sync and choose models from your configured providers
+
+```bash
+./21pins models sync
+./21pins models list --provider openrouter --search gemini
+./21pins models choose --provider openrouter --search gpt
+```
+
+`models choose` prints a routing-ready model string like `openrouter/openai/gpt-4o`.
+
 ### 2) Create an app token
 
 ```bash
@@ -223,6 +233,9 @@ approvals get <approval-id>
 approvals list [--grant <grant-id>]
 approvals approve <approval-id> --approver-sub <ck_sub> [--reason text]
 approvals reject <approval-id> --approver-sub <ck_sub> [--reason text]
+models sync [--provider <provider>]
+models list [--provider <provider>] [--search text] [--json]
+models choose [--provider <provider>] [--search text] [--index N]
 serve [--port 8787]
 ```
 

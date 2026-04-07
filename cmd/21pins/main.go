@@ -44,6 +44,8 @@ func main() {
 		handleApprovals(st, os.Args[2:])
 	case "serve":
 		handleServe(st, os.Args[2:])
+	case "models":
+		handleModels(st, os.Args[2:])
 	case "status":
 		handleStatus(st)
 	default:
@@ -84,6 +86,9 @@ Commands:
   approvals list [--grant <grant-id>]
   approvals approve <approval-id> --approver-sub <ck_sub> [--reason text]
   approvals reject <approval-id> --approver-sub <ck_sub> [--reason text]
+  models sync [--provider <provider>]
+  models list [--provider <provider>] [--search text] [--json]
+  models choose [--provider <provider>] [--search text] [--index N]
   serve [--port 8787]
 `)
 }
@@ -95,6 +100,7 @@ func handleStatus(st *store.Store) {
 	fmt.Printf("Grants configured: %d\n", len(st.ListGrants()))
 	fmt.Printf("Receipts recorded: %d\n", len(st.ListReceipts("")))
 	fmt.Printf("Approvals recorded: %d\n", len(st.ListApprovals("")))
+	fmt.Printf("Model catalogs cached: %d\n", len(st.ListModelCatalogs()))
 }
 
 func handleKey(st *store.Store, args []string) {

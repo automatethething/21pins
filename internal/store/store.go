@@ -20,11 +20,24 @@ import (
 type State struct {
 	ProviderKeys    map[string]string         `json:"provider_keys"`
 	ProviderKeySets map[string]ProviderKeySet `json:"provider_keysets,omitempty"`
+	ModelCatalogs   map[string]ModelCatalog   `json:"model_catalogs,omitempty"`
 	Tokens          []TokenRecord             `json:"tokens"`
 	Grants          []policy.Grant            `json:"grants,omitempty"`
 	Receipts        []policy.Receipt          `json:"receipts,omitempty"`
 	Approvals       []policy.ApprovalRequest  `json:"approvals,omitempty"`
 	SigningKeys     SigningKeys               `json:"signing_keys,omitempty"`
+}
+
+type ProviderModel struct {
+	ID            string `json:"id"`
+	Name          string `json:"name,omitempty"`
+	ContextWindow int    `json:"context_window,omitempty"`
+}
+
+type ModelCatalog struct {
+	Provider string          `json:"provider"`
+	SyncedAt string          `json:"synced_at"`
+	Models   []ProviderModel `json:"models"`
 }
 
 type ProviderKeySet struct {
@@ -84,7 +97,7 @@ func (s *Store) loadOrInit() error {
 
 	_, err := os.Stat(s.path)
 	if errors.Is(err, os.ErrNotExist) {
-		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, Tokens: []TokenRecord{}}
+		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, ModelCatalogs: map[string]ModelCatalog{}, Tokens: []TokenRecord{}}
 		return s.saveLocked()
 	}
 	if err != nil {
@@ -97,7 +110,7 @@ func (s *Store) loadOrInit() error {
 	}
 
 	if len(b) == 0 {
-		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, Tokens: []TokenRecord{}}
+		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, ModelCatalogs: map[string]ModelCatalog{}, Tokens: []TokenRecord{}}
 		return s.saveLocked()
 	}
 
@@ -109,6 +122,9 @@ func (s *Store) loadOrInit() error {
 	}
 	if s.state.ProviderKeySets == nil {
 		s.state.ProviderKeySets = map[string]ProviderKeySet{}
+	}
+	if s.state.ModelCatalogs == nil {
+		s.state.ModelCatalogs = map[string]ModelCatalog{}
 	}
 	if s.state.Tokens == nil {
 		s.state.Tokens = []TokenRecord{}
@@ -430,6 +446,57 @@ func (s *Store) ListProviders() []string {
 	}
 	slices.Sort(providers)
 	return providers
+}
+
+func (s *Store) SaveModelCatalog(provider string, models []ProviderModel) error {
+	provider = normalizeProvider(provider)
+	if provider == "" {
+		return errors.New("provider is required")
+	}
+	out := make([]ProviderModel, len(models))
+	copy(out, models)
+	slices.SortFunc(out, func(a, b ProviderModel) int {
+		return strings.Compare(a.ID, b.ID)
+	})
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state.ModelCatalogs == nil {
+		s.state.ModelCatalogs = map[string]ModelCatalog{}
+	}
+	s.state.ModelCatalogs[provider] = ModelCatalog{
+		Provider: provider,
+		SyncedAt: time.Now().UTC().Format(time.RFC3339),
+		Models:   out,
+	}
+	return s.saveLocked()
+}
+
+func (s *Store) GetModelCatalog(provider string) (ModelCatalog, bool) {
+	provider = normalizeProvider(provider)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.state.ModelCatalogs[provider]
+	if !ok {
+		return ModelCatalog{}, false
+	}
+	models := make([]ProviderModel, len(c.Models))
+	copy(models, c.Models)
+	c.Models = models
+	return c, true
+}
+
+func (s *Store) ListModelCatalogs() map[string]ModelCatalog {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make(map[string]ModelCatalog, len(s.state.ModelCatalogs))
+	for k, c := range s.state.ModelCatalogs {
+		models := make([]ProviderModel, len(c.Models))
+		copy(models, c.Models)
+		c.Models = models
+		out[k] = c
+	}
+	return out
 }
 
 func (s *Store) ensureProviderKeySetLocked(provider string) ProviderKeySet {
