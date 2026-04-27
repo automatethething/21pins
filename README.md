@@ -99,6 +99,8 @@ Copy the token output. It is shown once.
 
 ```bash
 ./21pins serve --port 8787
+# LAN mode (trusted network only)
+./21pins serve --host 0.0.0.0 --port 8787
 ```
 
 ## Web app usage
@@ -196,7 +198,8 @@ Fetch/export receipts:
 ## Security notes
 
 - v1 is local-file storage (`0600`) + per-app access tokens.
-- Gateway only listens on `127.0.0.1`.
+- Gateway listens on `127.0.0.1` by default.
+- You can opt into LAN access with `serve --host 0.0.0.0`.
 - Canonical grant IDs are the revocation/audit source of truth.
 - Signed grant exports are short-lived operational credentials (15m default TTL).
 - Pin 7 is enforced: threshold-crossing actions require explicit approval before they can pass.
@@ -236,7 +239,7 @@ approvals reject <approval-id> --approver-sub <ck_sub> [--reason text]
 models sync [--provider <provider>]
 models list [--provider <provider>] [--search text] [--json]
 models choose [--provider <provider>] [--search text] [--index N]
-serve [--port 8787]
+serve [--host 127.0.0.1] [--port 8787]
 ```
 
 Schema reference: `docs/phase1-schemas.md`

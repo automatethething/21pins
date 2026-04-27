@@ -89,7 +89,7 @@ Commands:
   models sync [--provider <provider>]
   models list [--provider <provider>] [--search text] [--json]
   models choose [--provider <provider>] [--search text] [--index N]
-  serve [--port 8787]
+  serve [--host 127.0.0.1] [--port 8787]
 `)
 }
 
@@ -627,11 +627,12 @@ func handleApprovals(st *store.Store, args []string) {
 
 func handleServe(st *store.Store, args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	host := fs.String("host", "127.0.0.1", "gateway bind host (use 0.0.0.0 for LAN)")
 	port := fs.Int("port", 8787, "gateway port")
 	_ = fs.Parse(args)
 
-	srv := gateway.NewServer(st, gateway.Config{Port: *port})
-	fmt.Printf("21pins gateway listening on http://127.0.0.1:%d\n", *port)
+	srv := gateway.NewServer(st, gateway.Config{Host: *host, Port: *port})
+	fmt.Printf("21pins gateway listening on http://%s:%d\n", *host, *port)
 	fmt.Println("Use Authorization: Bearer <21pins-token>")
 	if err := srv.ListenAndServe(); err != nil {
 		fmt.Fprintf(os.Stderr, "gateway error: %v\n", err)

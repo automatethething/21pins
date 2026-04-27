@@ -13,6 +13,7 @@ import (
 )
 
 type Config struct {
+	Host              string
 	Port              int
 	OpenAIBaseURL     string
 	OpenRouterBaseURL string
@@ -57,10 +58,15 @@ func NewServer(st *store.Store, cfg Config) *Server {
 func (s *Server) Handler() http.Handler { return s.handler }
 
 func (s *Server) ListenAndServe() error {
-	addr := fmt.Sprintf("127.0.0.1:%d", s.cfg.Port)
-	if s.cfg.Port == 0 {
-		addr = "127.0.0.1:8787"
+	host := strings.TrimSpace(s.cfg.Host)
+	if host == "" {
+		host = "127.0.0.1"
 	}
+	port := s.cfg.Port
+	if port == 0 {
+		port = 8787
+	}
+	addr := fmt.Sprintf("%s:%d", host, port)
 	return http.ListenAndServe(addr, s.handler)
 }
 
