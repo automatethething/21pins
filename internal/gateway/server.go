@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -195,10 +196,13 @@ func (s *Server) handleProviderPassthrough(w http.ResponseWriter, r *http.Reques
 		upstream += "?" + query
 	}
 	body, _ := io.ReadAll(r.Body)
+	log.Printf("[gateway] Proxying %s request to %s (provider: %s)\n", r.Method, upstream, provider)
 	if err := s.forwardRequest(provider, upstream, r.Method, r.Header, body, w); err != nil {
+		log.Printf("[gateway] Error proxying request to %s: %v\n", upstream, err)
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 		return
 	}
+	log.Printf("[gateway] Successfully proxied %s request to %s\n", r.Method, upstream)
 }
 
 func (s *Server) providerBase(provider string) (string, error) {
