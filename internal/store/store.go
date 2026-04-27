@@ -104,6 +104,18 @@ func (s *Store) loadOrInit() error {
 		return err
 	}
 
+	if err := s.reloadLocked(); err != nil {
+		return err
+	}
+
+	changed := s.migrateProviderKeysLocked()
+	if changed {
+		return s.saveLocked()
+	}
+	return nil
+}
+
+func (s *Store) reloadLocked() error {
 	b, err := os.ReadFile(s.path)
 	if err != nil {
 		return err
@@ -111,7 +123,7 @@ func (s *Store) loadOrInit() error {
 
 	if len(b) == 0 {
 		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, ModelCatalogs: map[string]ModelCatalog{}, Tokens: []TokenRecord{}}
-		return s.saveLocked()
+		return nil
 	}
 
 	if err := json.Unmarshal(b, &s.state); err != nil {
@@ -137,11 +149,6 @@ func (s *Store) loadOrInit() error {
 	}
 	if s.state.Approvals == nil {
 		s.state.Approvals = []policy.ApprovalRequest{}
-	}
-
-	changed := s.migrateProviderKeysLocked()
-	if changed {
-		return s.saveLocked()
 	}
 	return nil
 }
@@ -603,6 +610,11 @@ func (s *Store) ValidateToken(raw, requiredScope string) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Reload latest token/grant state from disk so long-running gateway processes
+	// can validate tokens created after startup without requiring restart.
+	_ = s.reloadLocked()
+
 	for i := range s.state.Tokens {
 		t := &s.state.Tokens[i]
 		if t.TokenHash != h || t.RevokedAt != "" {
