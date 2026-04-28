@@ -585,17 +585,17 @@ func (s *Store) ListTokens() []TokenRecord {
 	return out
 }
 
-func (s *Store) RevokeToken(raw string) error {
-	h := tokenHash(raw)
-	if h == "" {
-		return errors.New("token required")
+func (s *Store) RevokeToken(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("token name required")
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.state.Tokens {
-		if s.state.Tokens[i].TokenHash == h {
+		if s.state.Tokens[i].Name == name { // Changed from TokenHash == h
 			s.state.Tokens[i].RevokedAt = now
 			return s.saveLocked()
 		}
