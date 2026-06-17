@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/petrichor/21pins-cli/internal/policy"
@@ -221,6 +222,10 @@ func (s *Store) ListApprovals(grantID string) []policy.ApprovalRequest {
 }
 
 func (s *Store) ResolveApproval(id string, status policy.ApprovalStatus, approverSub, reason string) (policy.ApprovalRequest, error) {
+	return s.ResolveApprovalWithAttestation(id, status, approverSub, reason, policy.IdentityAttestation{})
+}
+
+func (s *Store) ResolveApprovalWithAttestation(id string, status policy.ApprovalStatus, approverSub, reason string, att policy.IdentityAttestation) (policy.ApprovalRequest, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ensurePolicyState()
@@ -235,6 +240,9 @@ func (s *Store) ResolveApproval(id string, status policy.ApprovalStatus, approve
 			}
 			s.state.Approvals[i].Status = status
 			s.state.Approvals[i].ApproverSub = approverSub
+			if strings.TrimSpace(att.ID) != "" {
+				s.state.Approvals[i].ApproverAttestation = &att
+			}
 			s.state.Approvals[i].Reason = reason
 			s.state.Approvals[i].ResolvedAt = &now
 			if err := s.saveLocked(); err != nil {

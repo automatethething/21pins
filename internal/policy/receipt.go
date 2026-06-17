@@ -9,7 +9,7 @@ import (
 )
 
 func NewReceipt(grant Grant, req ActionRequest, result EvaluationResult, now time.Time) Receipt {
-	return Receipt{
+	r := Receipt{
 		ID:         NewID("rcp"),
 		GrantID:    grant.ID,
 		Sub:        req.Sub,
@@ -22,21 +22,26 @@ func NewReceipt(grant Grant, req ActionRequest, result EvaluationResult, now tim
 		CostCents:  req.CostCents,
 		CreatedAt:  now,
 	}
+	if grant.IdentityAttestation != nil {
+		r.IdentityAttestationID = grant.IdentityAttestation.ID
+	}
+	return r
 }
 
 type signableReceipt struct {
-	ID          string               `json:"receipt_id"`
-	GrantID     string               `json:"grant_id"`
-	Sub         string               `json:"sub"`
-	Authority   []string             `json:"authority_chain"`
-	PinStates   map[string]PinStatus `json:"pin_states"`
-	Decision    Decision             `json:"decision"`
-	Capability  string               `json:"capability"`
-	DataClass   string               `json:"data_class"`
-	Target      string               `json:"target"`
-	CostCents   int64                `json:"cost_cents"`
-	ApprovalRef string               `json:"approval_ref,omitempty"`
-	CreatedAt   time.Time            `json:"created_at"`
+	ID                    string               `json:"receipt_id"`
+	GrantID               string               `json:"grant_id"`
+	Sub                   string               `json:"sub"`
+	Authority             []string             `json:"authority_chain"`
+	PinStates             map[string]PinStatus `json:"pin_states"`
+	Decision              Decision             `json:"decision"`
+	Capability            string               `json:"capability"`
+	DataClass             string               `json:"data_class"`
+	Target                string               `json:"target"`
+	CostCents             int64                `json:"cost_cents"`
+	ApprovalRef           string               `json:"approval_ref,omitempty"`
+	IdentityAttestationID string               `json:"identity_attestation_id,omitempty"`
+	CreatedAt             time.Time            `json:"created_at"`
 }
 
 func SignReceipt(r Receipt, privateKey ed25519.PrivateKey, keyID string) (Receipt, error) {
@@ -70,18 +75,19 @@ func VerifyReceipt(r Receipt, publicKey ed25519.PublicKey) error {
 
 func receiptPayloadBytes(r Receipt) ([]byte, error) {
 	s := signableReceipt{
-		ID:          r.ID,
-		GrantID:     r.GrantID,
-		Sub:         r.Sub,
-		Authority:   r.Authority,
-		PinStates:   r.PinStates,
-		Decision:    r.Decision,
-		Capability:  r.Capability,
-		DataClass:   r.DataClass,
-		Target:      r.Target,
-		CostCents:   r.CostCents,
-		ApprovalRef: r.ApprovalRef,
-		CreatedAt:   r.CreatedAt,
+		ID:                    r.ID,
+		GrantID:               r.GrantID,
+		Sub:                   r.Sub,
+		Authority:             r.Authority,
+		PinStates:             r.PinStates,
+		Decision:              r.Decision,
+		Capability:            r.Capability,
+		DataClass:             r.DataClass,
+		Target:                r.Target,
+		CostCents:             r.CostCents,
+		ApprovalRef:           r.ApprovalRef,
+		IdentityAttestationID: r.IdentityAttestationID,
+		CreatedAt:             r.CreatedAt,
 	}
 	return json.Marshal(s)
 }

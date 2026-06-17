@@ -26,12 +26,38 @@ type State struct {
 	Receipts        []policy.Receipt          `json:"receipts,omitempty"`
 	Approvals       []policy.ApprovalRequest  `json:"approvals,omitempty"`
 	SigningKeys     SigningKeys               `json:"signing_keys,omitempty"`
+	UsageEvents     []UsageEvent              `json:"usage_events,omitempty"`
 }
 
 type ProviderModel struct {
-	ID            string `json:"id"`
-	Name          string `json:"name,omitempty"`
-	ContextWindow int    `json:"context_window,omitempty"`
+	ID                              string `json:"id"`
+	Name                            string `json:"name,omitempty"`
+	ContextWindow                   int    `json:"context_window,omitempty"`
+	PromptPriceMicrosPerMillion     int64  `json:"prompt_price_micros_per_million,omitempty"`
+	CompletionPriceMicrosPerMillion int64  `json:"completion_price_micros_per_million,omitempty"`
+	PricingSource                   string `json:"pricing_source,omitempty"`
+}
+
+type UsageEvent struct {
+	ID                  string    `json:"usage_id"`
+	CreatedAt           time.Time `json:"created_at"`
+	Source              string    `json:"source"`
+	Provider            string    `json:"provider"`
+	Model               string    `json:"model"`
+	RequestedModel      string    `json:"requested_model"`
+	AppTokenName        string    `json:"app_token_name,omitempty"`
+	BillingMode         string    `json:"billing_mode"`
+	PromptTokens        int64     `json:"prompt_tokens"`
+	CompletionTokens    int64     `json:"completion_tokens"`
+	CacheReadTokens     int64     `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens    int64     `json:"cache_write_tokens,omitempty"`
+	TotalTokens         int64     `json:"total_tokens"`
+	EstimatedCostMicros int64     `json:"estimated_cost_micros"`
+	Currency            string    `json:"currency"`
+	PricingSource       string    `json:"pricing_source"`
+	Warning             string    `json:"warning,omitempty"`
+	RequestID           string    `json:"request_id,omitempty"`
+	ReceiptID           string    `json:"receipt_id,omitempty"`
 }
 
 type ModelCatalog struct {
@@ -48,13 +74,13 @@ type ProviderKeySet struct {
 }
 
 type ProviderKeyRecord struct {
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	Secret    string `json:"secret"`
-	CreatedAt string `json:"created_at"`
+	ID         string `json:"id"`
+	Status     string `json:"status"`
+	Secret     string `json:"secret"`
+	CreatedAt  string `json:"created_at"`
 	VerifiedAt string `json:"verified_at,omitempty"`
-	RevokedAt string `json:"revoked_at,omitempty"`
-	ExpiresAt string `json:"expires_at,omitempty"`
+	RevokedAt  string `json:"revoked_at,omitempty"`
+	ExpiresAt  string `json:"expires_at,omitempty"`
 }
 
 const (
@@ -149,6 +175,9 @@ func (s *Store) reloadLocked() error {
 	}
 	if s.state.Approvals == nil {
 		s.state.Approvals = []policy.ApprovalRequest{}
+	}
+	if s.state.UsageEvents == nil {
+		s.state.UsageEvents = []UsageEvent{}
 	}
 	return nil
 }
@@ -493,6 +522,39 @@ func (s *Store) GetModelCatalog(provider string) (ModelCatalog, bool) {
 	return c, true
 }
 
+func (s *Store) AddUsageEvent(event UsageEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state.UsageEvents == nil {
+		s.state.UsageEvents = []UsageEvent{}
+	}
+	if strings.TrimSpace(event.ID) == "" {
+		event.ID = "use_" + generateKeyID()[4:]
+	}
+	if event.CreatedAt.IsZero() {
+		event.CreatedAt = time.Now().UTC()
+	}
+	s.state.UsageEvents = append(s.state.UsageEvents, event)
+	return s.saveLocked()
+}
+
+func (s *Store) ListUsageEvents() []UsageEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]UsageEvent, len(s.state.UsageEvents))
+	copy(out, s.state.UsageEvents)
+	slices.SortFunc(out, func(a, b UsageEvent) int {
+		if a.CreatedAt.After(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return 1
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	return out
+}
+
 func (s *Store) ListModelCatalogs() map[string]ModelCatalog {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -585,17 +647,18 @@ func (s *Store) ListTokens() []TokenRecord {
 	return out
 }
 
-func (s *Store) RevokeToken(name string) error {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return errors.New("token name required")
+func (s *Store) RevokeToken(nameOrRaw string) error {
+	nameOrRaw = strings.TrimSpace(nameOrRaw)
+	if nameOrRaw == "" {
+		return errors.New("token name or raw token required")
 	}
+	h := tokenHash(nameOrRaw)
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := range s.state.Tokens {
-		if s.state.Tokens[i].Name == name { // Changed from TokenHash == h
+		if s.state.Tokens[i].Name == nameOrRaw || (h != "" && s.state.Tokens[i].TokenHash == h) {
 			s.state.Tokens[i].RevokedAt = now
 			return s.saveLocked()
 		}
@@ -604,9 +667,14 @@ func (s *Store) RevokeToken(name string) error {
 }
 
 func (s *Store) ValidateToken(raw, requiredScope string) bool {
+	_, ok := s.ValidateTokenRecord(raw, requiredScope)
+	return ok
+}
+
+func (s *Store) ValidateTokenRecord(raw, requiredScope string) (TokenRecord, bool) {
 	h := tokenHash(raw)
 	if h == "" {
-		return false
+		return TokenRecord{}, false
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -621,13 +689,13 @@ func (s *Store) ValidateToken(raw, requiredScope string) bool {
 			continue
 		}
 		if !tokenAllowsScope(t.Scopes, requiredScope) {
-			return false
+			return TokenRecord{}, false
 		}
 		t.LastUsedAt = time.Now().UTC().Format(time.RFC3339)
 		_ = s.saveLocked()
-		return true
+		return *t, true
 	}
-	return false
+	return TokenRecord{}, false
 }
 
 func tokenAllowsScope(scopes []string, required string) bool {
@@ -667,9 +735,11 @@ func tokenHash(raw string) string {
 	return hex.EncodeToString(h[:])
 }
 
-var supportedProviders = []string{"anthropic", "gemini", "ollama", "openai", "openrouter"}
+var supportedProviders = []string{"anthropic", "deepseek", "gemini", "ollama", "openai", "openrouter"}
 
 var providerAliases = map[string]string{
+	"deepseek.com":       "deepseek",
+	"deepseek-ai":        "deepseek",
 	"openrouter.ai":      "openrouter",
 	"google":             "gemini",
 	"google-ai-studio":   "gemini",

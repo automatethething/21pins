@@ -952,6 +952,48 @@
       }
     }
   </style>
+
+    <script>
+      !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split('.');2==o.length&&(t=t[o[0]],e=o[1]);t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement('script')).type='text/javascript',p.crossOrigin='anonymous',p.async=!0,p.src='https://logs.petrichorlabs.ca/static/array.js',(r=t.getElementsByTagName('script')[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a='posthog',u.people=u.people||[],u.toString=function(t){var e='posthog';return'posthog'!==a&&(e+='.'+a),t||(e+=' (stub)'),e},u.people.toString=function(){return u.toString(1)+'.people'},o='init capture register unregister identify alias people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing reloadFeatureFlags onFeatureFlags getFeatureFlag getFeatureFlagPayload isFeatureEnabled'.split(' '),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+      posthog.init('phc_hu8ju31msg3MkG3D8PS0pWPuDQ7r3ch1q9ordFuI5nK',{api_host:'https://logs.petrichorlabs.ca',capture_pageview:true,capture_pageleave:true});
+      posthog.capture('landing_viewed', { app: '21pins', surface: 'website' });
+    </script>
+
+<script>
+(function(){
+  function capture(event, props){
+    try {
+      window.posthog && window.posthog.capture && window.posthog.capture(event, Object.assign({
+        source: 'flowstate_intent_tracker',
+        path: window.location.pathname,
+        host: window.location.host
+      }, props || {}));
+    } catch (_) {}
+  }
+  function classify(text, href){
+    var h = ((text || '') + ' ' + (href || '')).toLowerCase();
+    if (/consentkeys|sign[ -]?in|log[ -]?in|auth|join|start|signup|sign[ -]?up/.test(h)) return ['cta_clicked','signup_started','consentkeys_login_started'];
+    if (/checkout|pay|upgrade|premium|unlock|pricing|subscribe/.test(h)) return ['cta_clicked','checkout_started'];
+    if (/submit|create|evaluate|match|upload|share|connect|apply|request|quote|post/.test(h)) return ['cta_clicked','primary_action_completed'];
+    return ['cta_clicked'];
+  }
+  function seen(key){
+    try { if (sessionStorage.getItem(key)) return true; sessionStorage.setItem(key, '1'); } catch (_) {}
+    return false;
+  }
+  if (/dashboard|app|profile|records|matches|evaluate|radar|requests|quotes|onboarding|post-job|applications/.test(location.pathname.toLowerCase())) {
+    var key = 'flowstate:activation:' + location.host + ':' + location.pathname;
+    if (!seen(key)) capture('activation_completed', {trigger: 'activated_path'});
+  }
+  document.addEventListener('click', function(event){
+    var action = event.target && event.target.closest && event.target.closest('a,button');
+    if (!action) return;
+    var text = (action.textContent || '').trim().slice(0, 120);
+    var href = action.href || '';
+    classify(text, href).forEach(function(name){ capture(name, {text: text, href: href, tag: action.tagName.toLowerCase()}); });
+  }, true);
+})();
+</script>
 </head>
 <body>
 
@@ -987,6 +1029,7 @@
       </p>
       <div class="hero-actions">
         <a href="#quickstart" class="btn-primary">Install 21pins CLI →</a>
+        <a href="https://github.com/automatethething/21pins/blob/main/docs/pi-21pins-json-demo.md" class="btn-ghost">Pi JSON demo →</a>
         <a href="#how-it-works" class="btn-ghost">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/>
@@ -1021,6 +1064,7 @@
           <div class="diagram-providers">
             <span class="provider-chip">openai</span>
             <span class="provider-chip">anthropic</span>
+            <span class="provider-chip">deepseek</span>
             <span class="provider-chip">openrouter</span>
             <span class="provider-chip">gemini</span>
             <span class="provider-chip">ollama</span>
@@ -1039,7 +1083,7 @@
       <div class="stat-desc">checked before every model call</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num"><span>5</span> providers</div>
+      <div class="stat-num"><span>6</span> providers</div>
       <div class="stat-desc">ready today: OpenAI, Anthropic, OpenRouter, Gemini, Ollama</div>
     </div>
     <div class="stat-item">
@@ -1119,6 +1163,7 @@
         </p>
         <div class="step-code">
           <span class="cmd">21pins</span> key set <span class="arg">anthropic</span> <span class="flag">--value</span> <span class="arg">"$ANTHROPIC_API_KEY"</span><br>
+          <span class="cmd">21pins</span> key set <span class="arg">deepseek</span> <span class="flag">--value</span> <span class="arg">"$DEEPSEEK_API_KEY"</span><br>
           <span class="cmd">21pins</span> key set <span class="arg">openrouter</span> <span class="flag">--value</span> <span class="arg">"$OR_KEY"</span><br>
           <span class="cmd">21pins</span> key set <span class="arg">gemini</span> <span class="flag">--value</span> <span class="arg">"$GEMINI_KEY"</span>
         </div>
@@ -1231,7 +1276,8 @@
       <h2 class="qs-title">From zero to routed in under two minutes.</h2>
       <p class="qs-sub">
         Build from source, initialise the config, add your keys, and start routing.
-        Any app that speaks OpenAI-compatible chat will work immediately.
+        Any app that speaks OpenAI-compatible chat will work immediately. Add
+        <code>X-21Pins-*</code> headers when you want live grant enforcement and receipts.
       </p>
     </div>
     <div class="code-block">
@@ -1251,6 +1297,7 @@
 <span class="c-blank"></span>
 <span class="c-comment"># 3. Set provider keys</span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">anthropic</span>    <span class="c-flag">--value</span> <span class="c-string">"$ANTHROPIC_API_KEY"</span></span>
+<span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">deepseek</span>     <span class="c-flag">--value</span> <span class="c-string">"$DEEPSEEK_API_KEY"</span></span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">openrouter</span>   <span class="c-flag">--value</span> <span class="c-string">"$OR_KEY"</span></span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">gemini</span>       <span class="c-flag">--value</span> <span class="c-string">"$GEMINI_KEY"</span></span>
 <span class="c-blank"></span>
@@ -1264,6 +1311,7 @@
 <span class="c-comment"># 6. Point your app at the gateway</span>
 <span class="c-output">PINS21_BASE_URL=http://127.0.0.1:8787/v1</span>
 <span class="c-output">PINS21_TOKEN=&lt;token-from-step-4&gt;</span>
+<span class="c-output">X-21Pins-Grant-ID=&lt;optional grant id for policy receipts&gt;</span>
       </div>
     </div>
   </div>
@@ -1315,7 +1363,7 @@
         <div class="icp-role">AI builder / operator</div>
         <div class="icp-headline">You build internal tools and refuse to embed provider keys everywhere.</div>
         <p class="icp-desc">
-          Issue scoped app tokens. 21pins enforces provider and budget policy while apps never see raw keys.
+          Issue scoped app tokens. 21pins now enforces provider, data, budget, and approval policy on gateway requests while apps never see raw keys.
         </p>
       </div>
       <div class="icp-card">

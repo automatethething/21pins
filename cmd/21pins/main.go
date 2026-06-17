@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
@@ -11,6 +13,8 @@ import (
 
 	"github.com/petrichor/21pins-cli/internal/config"
 	"github.com/petrichor/21pins-cli/internal/gateway"
+	"github.com/petrichor/21pins-cli/internal/hosted"
+	"github.com/petrichor/21pins-cli/internal/identity"
 	"github.com/petrichor/21pins-cli/internal/policy"
 	"github.com/petrichor/21pins-cli/internal/store"
 )
@@ -46,6 +50,8 @@ func main() {
 		handleServe(st, os.Args[2:])
 	case "models":
 		handleModels(st, os.Args[2:])
+	case "hosted":
+		handleHosted(os.Args[2:])
 	case "status":
 		handleStatus(st)
 	default:
@@ -73,7 +79,7 @@ Commands:
   token create <name> [--scopes proxy:chat,proxy:providers]
   token list
   token revoke <token>
-  grant create --sub <ck_sub> --capabilities a,b --data-classes a,b --targets a,b [--budget-limit-cents 10000] [--budget-window-minutes 1440] [--approval-threshold-cents 0]
+  grant create --sub <ck_sub>|--ck-whoami|--ck-hosted --capabilities a,b --data-classes a,b --targets a,b [--hosted-url URL] [--budget-limit-cents 10000] [--budget-window-minutes 1440] [--approval-threshold-cents 0]
   grant inspect <grant-id>
   grant list
   grant revoke <grant-id>
@@ -84,11 +90,13 @@ Commands:
   receipts export <receipt-id> [--out path]
   approvals get <approval-id>
   approvals list [--grant <grant-id>]
-  approvals approve <approval-id> --approver-sub <ck_sub> [--reason text]
-  approvals reject <approval-id> --approver-sub <ck_sub> [--reason text]
+  approvals approve <approval-id> --ck-hosted [--hosted-url URL] [--reason text]
+  approvals reject <approval-id> --ck-hosted [--hosted-url URL] [--reason text]
   models sync [--provider <provider>]
   models list [--provider <provider>] [--search text] [--json]
   models choose [--provider <provider>] [--search text] [--index N]
+  hosted status [--json] [--hosted-url URL]
+  hosted smoke [--json] [--hosted-url URL] [--key-id hosted-ed25519-v1] [--require-public-key]
   serve [--host 127.0.0.1] [--port 8787]
 `)
 }
@@ -101,6 +109,80 @@ func handleStatus(st *store.Store) {
 	fmt.Printf("Receipts recorded: %d\n", len(st.ListReceipts("")))
 	fmt.Printf("Approvals recorded: %d\n", len(st.ListApprovals("")))
 	fmt.Printf("Model catalogs cached: %d\n", len(st.ListModelCatalogs()))
+	hostedAttested := 0
+	for _, g := range st.ListGrants() {
+		if g.IdentityAttestation != nil {
+			hostedAttested++
+		}
+	}
+	fmt.Printf("Hosted identity attestations: %d\n", hostedAttested)
+}
+
+func handleHosted(args []string) {
+	if len(args) == 0 {
+		fatalf("hosted subcommand required: status|smoke")
+	}
+	switch args[0] {
+	case "status":
+		fs := flag.NewFlagSet("hosted status", flag.ExitOnError)
+		jsonOut := fs.Bool("json", false, "print machine-readable JSON")
+		hostedURL := fs.String("hosted-url", "", "hosted 21pins control plane URL")
+		_ = fs.Parse(args[1:])
+		baseURL := strings.TrimSpace(*hostedURL)
+		if baseURL == "" {
+			baseURL = hosted.DefaultBaseURL()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		client := hosted.Client{BaseURL: baseURL, HTTPClient: &http.Client{Timeout: 5 * time.Second}}
+		status := client.Status(ctx)
+		if *jsonOut {
+			printJSON(status)
+			return
+		}
+		fmt.Printf("Hosted URL: %s\n", status.URL)
+		fmt.Printf("State: %s\n", status.State)
+		fmt.Printf("CK attestation available: %t\n", status.CKAttestationAvailable)
+		fmt.Printf("Checked at: %s\n", status.CheckedAt.Format(time.RFC3339))
+		if status.Error != "" {
+			fmt.Printf("Error: %s\n", status.Error)
+		}
+	case "smoke":
+		fs := flag.NewFlagSet("hosted smoke", flag.ExitOnError)
+		jsonOut := fs.Bool("json", false, "print machine-readable JSON")
+		hostedURL := fs.String("hosted-url", "", "hosted 21pins control plane URL")
+		keyID := fs.String("key-id", hosted.DefaultSmokeKeyID, "expected hosted signing key id")
+		requirePublicKey := fs.Bool("require-public-key", false, "fail if pinned public key env is missing")
+		_ = fs.Parse(args[1:])
+		baseURL := strings.TrimSpace(*hostedURL)
+		if baseURL == "" {
+			baseURL = hosted.DefaultBaseURL()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		client := hosted.Client{BaseURL: baseURL, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
+		report, err := client.Smoke(ctx, *keyID)
+		if *requirePublicKey && !report.PublicKeyLoaded {
+			fatalf("pinned public key env %s not loaded", report.PublicKeyEnv)
+		}
+		if err != nil {
+			if *jsonOut {
+				printJSON(map[string]any{"ok": false, "report": report, "error": err.Error()})
+			}
+			fatalf("hosted smoke failed: %v", err)
+		}
+		if *jsonOut {
+			printJSON(map[string]any{"ok": true, "report": report})
+			return
+		}
+		fmt.Printf("Hosted URL: %s\n", report.URL)
+		fmt.Printf("Health: %s\n", report.HealthState)
+		fmt.Printf("Session ID: %s\n", report.SessionID)
+		fmt.Printf("Poll status: %s\n", report.PollStatus)
+		fmt.Printf("Public key env: %s (loaded=%t)\n", report.PublicKeyEnv, report.PublicKeyLoaded)
+	default:
+		fatalf("unknown hosted subcommand")
+	}
 }
 
 func handleKey(st *store.Store, args []string) {
@@ -338,6 +420,9 @@ func handleGrant(st *store.Store, args []string) {
 	case "create":
 		fs := flag.NewFlagSet("grant create", flag.ExitOnError)
 		sub := fs.String("sub", "", "ck subject")
+		ckWhoami := fs.Bool("ck-whoami", false, "read subject from `ck whoami` when --sub is omitted")
+		ckHosted := fs.Bool("ck-hosted", false, "verify ConsentKeys identity through hosted 21pins control plane")
+		hostedURL := fs.String("hosted-url", "", "hosted 21pins control plane URL")
 		delegatedBy := fs.String("delegated-by", "", "delegator subject")
 		authority := fs.String("authority-chain", "", "comma-separated authority chain")
 		capabilities := fs.String("capabilities", "", "comma-separated capabilities")
@@ -348,22 +433,47 @@ func handleGrant(st *store.Store, args []string) {
 		approvalThreshold := fs.Int64("approval-threshold-cents", 0, "approval threshold in cents")
 		_ = fs.Parse(args[1:])
 
-		if strings.TrimSpace(*sub) == "" {
-			fatalf("--sub is required")
-		}
 		if strings.TrimSpace(*capabilities) == "" || strings.TrimSpace(*dataClasses) == "" || strings.TrimSpace(*targets) == "" {
 			fatalf("--capabilities, --data-classes, and --targets are required")
 		}
+
+		var attestation *policy.IdentityAttestation
+		var resolvedSub string
+		if *ckHosted {
+			if strings.TrimSpace(*sub) != "" || *ckWhoami {
+				fatalf("--ck-hosted cannot be combined with --sub or --ck-whoami")
+			}
+			baseURL := strings.TrimSpace(*hostedURL)
+			if baseURL == "" {
+				baseURL = hosted.DefaultBaseURL()
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			client := hosted.Client{BaseURL: baseURL, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
+			got, err := client.CompleteHostedAttestation(ctx, *budgetWindowMinutes, baseURL, time.Now().UTC(), os.Stderr)
+			if err != nil {
+				fatalf("hosted CK attestation failed: %v", err)
+			}
+			attestation = &got
+			resolvedSub = got.Subject
+		} else {
+			var err error
+			resolvedSub, err = identity.ResolveSubject(*sub, *ckWhoami, nil)
+			if err != nil {
+				fatalf("%v", err)
+			}
+		}
 		chain := splitCSV(*authority)
 		if len(chain) == 0 {
-			chain = []string{*sub}
+			chain = []string{resolvedSub}
 		}
 		now := time.Now().UTC()
 		grant, err := st.CreateGrant(policy.Grant{
-			Sub:         strings.TrimSpace(*sub),
-			DelegatedBy: strings.TrimSpace(*delegatedBy),
+			Sub:                 resolvedSub,
+			DelegatedBy:         strings.TrimSpace(*delegatedBy),
+			IdentityAttestation: attestation,
 			Pins: policy.Pins{
-				Identity:         policy.IdentityPin{Sub: strings.TrimSpace(*sub)},
+				Identity:         policy.IdentityPin{Sub: resolvedSub},
 				Authority:        policy.AuthorityPin{Chain: chain},
 				Capabilities:     policy.CapabilityPin{Allowed: splitCSV(*capabilities)},
 				DataPolicy:       policy.DataPolicyPin{AllowedClasses: splitCSV(*dataClasses)},
@@ -421,6 +531,22 @@ func handleGrant(st *store.Store, args []string) {
 	}
 }
 
+func validateApprovalForAction(a policy.ApprovalRequest, grantID, sub, capability, dataClass, target string, cost int64, now time.Time) error {
+	if a.Status != policy.ApprovalApproved {
+		return fmt.Errorf("approval is not approved: %s", a.Status)
+	}
+	if a.GrantID != grantID || a.Sub != sub || a.Capability != capability || a.DataClass != dataClass || a.Target != target || a.CostCents != cost {
+		return fmt.Errorf("approval does not match action request")
+	}
+	if a.ApproverAttestation == nil || a.ApproverAttestation.Subject != a.ApproverSub {
+		return fmt.Errorf("approval missing approver attestation")
+	}
+	if err := hosted.VerifyStoredAttestation(*a.ApproverAttestation, now); err != nil {
+		return fmt.Errorf("invalid approver attestation: %w", err)
+	}
+	return nil
+}
+
 func handleEvaluate(st *store.Store, args []string) {
 	fs := flag.NewFlagSet("evaluate", flag.ExitOnError)
 	grantID := fs.String("grant", "", "grant id")
@@ -447,11 +573,8 @@ func handleEvaluate(st *store.Store, args []string) {
 		if err != nil {
 			fatalf("approval lookup failed: %v", err)
 		}
-		if a.Status != policy.ApprovalApproved {
-			fatalf("approval is not approved: %s", a.Status)
-		}
-		if a.GrantID != *grantID || a.Sub != *sub || a.Capability != *capability || a.DataClass != *dataClass || a.Target != *target || a.CostCents != *cost {
-			fatalf("approval does not match action request")
+		if err := validateApprovalForAction(a, *grantID, *sub, *capability, *dataClass, *target, *cost, now); err != nil {
+			fatalf("%v", err)
 		}
 		approvalGranted = true
 	}
@@ -469,6 +592,10 @@ func handleEvaluate(st *store.Store, args []string) {
 
 	receipt := policy.NewReceipt(g, request, result, now)
 	var createdApprovalID string
+	usedApprovalID := strings.TrimSpace(*approvalID)
+	if usedApprovalID != "" {
+		receipt.ApprovalRef = usedApprovalID
+	}
 	if result.Decision == policy.DecisionRequireApproval {
 		a, err := st.CreateApproval(policy.ApprovalRequest{
 			GrantID:    *grantID,
@@ -506,6 +633,7 @@ func handleEvaluate(st *store.Store, args []string) {
 		"reasons":     result.Reasons,
 		"receipt_id":  receipt.ID,
 		"approval_id": createdApprovalID,
+		"approval_ref": receipt.ApprovalRef,
 		"signature":   receipt.Signature,
 	}
 	if *jsonOut {
@@ -601,21 +729,34 @@ func handleApprovals(st *store.Store, args []string) {
 		printJSON(st.ListApprovals(*grantID))
 	case "approve", "reject":
 		if len(args) < 2 {
-			fatalf("usage: approvals %s <approval-id> --approver-sub <ck_sub> [--reason text]", args[0])
+			fatalf("usage: approvals %s <approval-id> --ck-hosted [--hosted-url URL] [--reason text]", args[0])
 		}
 		approvalID := args[1]
 		fs := flag.NewFlagSet("approvals resolve", flag.ExitOnError)
-		approverSub := fs.String("approver-sub", "", "approver ck subject")
+		approverSub := fs.String("approver-sub", "", "approver ck subject (disabled without --ck-hosted)")
+		ckHosted := fs.Bool("ck-hosted", false, "verify approver through hosted 21pins control plane")
+		hostedURL := fs.String("hosted-url", "", "hosted 21pins control plane URL")
 		reason := fs.String("reason", "", "resolution reason")
 		_ = fs.Parse(args[2:])
-		if strings.TrimSpace(*approverSub) == "" {
-			fatalf("--approver-sub is required")
+		if !*ckHosted || strings.TrimSpace(*approverSub) != "" {
+			fatalf("approvals %s requires --ck-hosted and does not accept raw --approver-sub", args[0])
+		}
+		baseURL := strings.TrimSpace(*hostedURL)
+		if baseURL == "" {
+			baseURL = hosted.DefaultBaseURL()
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		client := hosted.Client{BaseURL: baseURL, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
+		att, err := client.CompleteHostedAttestation(ctx, 1440, baseURL, time.Now().UTC(), os.Stderr)
+		if err != nil {
+			fatalf("hosted approver attestation failed: %v", err)
 		}
 		status := policy.ApprovalApproved
 		if args[0] == "reject" {
 			status = policy.ApprovalRejected
 		}
-		a, err := st.ResolveApproval(approvalID, status, strings.TrimSpace(*approverSub), strings.TrimSpace(*reason))
+		a, err := st.ResolveApprovalWithAttestation(approvalID, status, att.Subject, strings.TrimSpace(*reason), att)
 		if err != nil {
 			fatalf("resolve approval failed: %v", err)
 		}
@@ -687,7 +828,7 @@ func printEvaluation(result policy.EvaluationResult, receiptID, approvalID strin
 	fmt.Printf("receipt_id: %s\n", receiptID)
 	if approvalID != "" {
 		fmt.Printf("approval_id: %s\n", approvalID)
-		fmt.Println("Next step: approvals approve <approval_id> --approver-sub <ck_sub>")
+		fmt.Println("Next step: approvals approve <approval_id> --ck-hosted")
 	}
 }
 

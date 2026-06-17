@@ -22,6 +22,8 @@ The long-term policy layer is modeled as seven control pins:
 - Run a local gateway at `127.0.0.1:8787`
 - OpenAI-compatible chat endpoint: `POST /v1/chat/completions`
 - Provider passthrough endpoint: `ANY /v1/providers/{provider}/{path}`
+- Pi → 21pins → OpenRouter usage ledger for streaming and non-streaming chat completions
+- Loopback-only usage API/UI: `GET /v1/usage` (`usage:read`) and `GET /ui`
 - **Phase 1 policy core:** canonical grant objects + signed grant exports (15m default TTL)
 - **7-pin evaluation engine:** per-pin pass/fail/requires_approval output + final decision
 - **Execution receipts:** persisted record of grant, pin states, spend, target, decision
@@ -51,6 +53,7 @@ go build -o 21pins ./cmd/21pins
 ./21pins key set openai --value "$OPENAI_API_KEY"
 ./21pins key set openrouter --value "$OPENROUTER_API_KEY"
 ./21pins key set anthropic --value "$ANTHROPIC_API_KEY"
+./21pins key set deepseek --value "$DEEPSEEK_API_KEY"
 ./21pins key set gemini --value "$GEMINI_API_KEY"
 # ollama usually does not need an API key
 ```
@@ -59,10 +62,11 @@ Canonical provider names are:
 - `openai`
 - `openrouter`
 - `anthropic`
+- `deepseek`
 - `gemini`
 - `ollama`
 
-Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`).
+Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`, `deepseek.com` -> `deepseek`).
 
 ### Optional: rotate keys safely
 
@@ -91,6 +95,8 @@ Use `--keep-previous-hours 0` for immediate old-key revocation.
 
 ```bash
 ./21pins token create my-web-app --scopes proxy:chat,proxy:providers
+# For Pi/OpenRouter usage dashboards, include usage:read:
+./21pins token create pi --scopes proxy:chat,usage:read
 ```
 
 Copy the token output. It is shown once.
@@ -118,10 +124,32 @@ const client = new OpenAI({
 });
 
 const resp = await client.chat.completions.create({
-  model: "openai/gpt-4o-mini", // or openrouter/openai/gpt-4.1-mini, ollama/llama3.2
+  model: "openai/gpt-4o-mini", // or openrouter/openai/gpt-4.1-mini, deepseek/deepseek-chat, ollama/llama3.2
   messages: [{ role: "user", content: "hello" }],
 });
 ```
+
+### Pi → 21pins → OpenRouter usage ledger
+
+Configure Pi (or any OpenAI-compatible client) to use the local gateway base URL and a 21pins token:
+
+```bash
+export OPENROUTER_API_KEY=...
+./21pins key set openrouter --value "$OPENROUTER_API_KEY"
+export PINS21_TOKEN="$(./21pins token create pi --scopes proxy:chat,usage:read | tail -n 1)"
+./21pins serve --port 8787
+```
+
+Then send chat completions with models like `openrouter/openai/gpt-4o-mini`. 21pins rewrites that to OpenRouter's model ID, forwards with your OpenRouter key, records token usage and estimated USD cost, and preserves the upstream response body. For streaming requests, 21pins adds `stream_options.include_usage=true` while preserving any existing `stream_options` fields.
+
+View local usage:
+
+```bash
+curl -H "Authorization: Bearer $PINS21_TOKEN" http://127.0.0.1:8787/v1/usage
+open http://127.0.0.1:8787/ui
+```
+
+`/v1/usage` requires `usage:read` and both `/v1/usage` and `/ui` are loopback-only. Usage records are separate from policy receipts; requests without policy headers can still produce usage ledger rows.
 
 ### Provider passthrough pattern
 
@@ -138,7 +166,7 @@ Create a canonical grant:
 
 ```bash
 ./21pins grant create \
-  --sub ck_sub_abc \
+  --ck-whoami \
   --capabilities llm.chat \
   --data-classes public \
   --targets openrouter \
@@ -165,11 +193,11 @@ Evaluate an action and emit an execution receipt:
   --cost-cents 250
 ```
 
-If pin 7 requires approval, resolve it manually:
+If pin 7 requires approval, resolve it with a hosted ConsentKeys approver attestation:
 
 ```bash
 ./21pins approvals list --grant <grant_id>
-./21pins approvals approve <approval_id> --approver-sub ck_sub_admin --reason "reviewed"
+./21pins approvals approve <approval_id> --ck-hosted --reason "reviewed"
 ```
 
 Then re-run with approval:
@@ -195,6 +223,21 @@ Fetch/export receipts:
 
 `receipts get` returns a compliance-focused artifact with signature and verification status.
 
+### Gateway-enforced policy headers
+
+The gateway can enforce the same grant policy on live proxy requests. Add these headers to any `/v1/chat/completions` or `/v1/providers/...` request:
+
+```bash
+-H "X-21Pins-Grant-ID: <grant_id>" \
+-H "X-21Pins-Sub: ck_sub_abc" \
+-H "X-21Pins-Capability: llm.chat" \
+-H "X-21Pins-Data-Class: public" \
+-H "X-21Pins-Cost-Cents: 250" \
+-H "X-21Pins-Approval-ID: <approval_id>" # only when pin 7 requires approval
+```
+
+21pins evaluates the seven pins before forwarding upstream, blocks denied requests, records signed receipts, and increments grant spend for allowed requests. Threshold-crossing gateway requests must include an approval resolved with `approvals approve <approval_id> --ck-hosted`.
+
 ## Security notes
 
 - v1 is local-file storage (`0600`) + per-app access tokens.
@@ -203,7 +246,9 @@ Fetch/export receipts:
 - Canonical grant IDs are the revocation/audit source of truth.
 - Signed grant exports are short-lived operational credentials (15m default TTL).
 - Pin 7 is enforced: threshold-crossing actions require explicit approval before they can pass.
-- Next milestone: encrypted vault + ConsentKeys CLI integration for stronger custody guarantees.
+- `grant create --ck-whoami` can hand off identity from the ConsentKeys CLI (`ck whoami`) when you do not want to paste a subject manually.
+- `grant create --ck-hosted` starts a hosted ConsentKeys attestation session, verifies the returned hosted signature with a pinned public key, and stores the attestation on the local grant.
+- Hosted CK attestation is used at grant creation only; gateway request evaluation remains local and keeps working if hosted is offline.
 
 ## Commands
 
@@ -223,7 +268,7 @@ key revoke <provider> --key-id <id>
 token create <name> [--scopes proxy:chat,proxy:providers]
 token list
 token revoke <token>
-grant create --sub <ck_sub> --capabilities a,b --data-classes a,b --targets a,b [--budget-limit-cents 10000] [--budget-window-minutes 1440] [--approval-threshold-cents 0]
+grant create --sub <ck_sub>|--ck-whoami|--ck-hosted --capabilities a,b --data-classes a,b --targets a,b [--hosted-url URL] [--budget-limit-cents 10000] [--budget-window-minutes 1440] [--approval-threshold-cents 0]
 grant inspect <grant-id>
 grant list
 grant revoke <grant-id>
@@ -234,16 +279,62 @@ receipts list [--grant <grant-id>]
 receipts export <receipt-id> [--out path]
 approvals get <approval-id>
 approvals list [--grant <grant-id>]
-approvals approve <approval-id> --approver-sub <ck_sub> [--reason text]
-approvals reject <approval-id> --approver-sub <ck_sub> [--reason text]
+approvals approve <approval-id> --ck-hosted [--hosted-url URL] [--reason text]
+approvals reject <approval-id> --ck-hosted [--hosted-url URL] [--reason text]
 models sync [--provider <provider>]
 models list [--provider <provider>] [--search text] [--json]
 models choose [--provider <provider>] [--search text] [--index N]
+hosted status [--json] [--hosted-url URL]
+hosted smoke [--json] [--hosted-url URL] [--key-id hosted-ed25519-v1] [--require-public-key]
 serve [--host 127.0.0.1] [--port 8787]
 ```
 
 Schema reference: `docs/phase1-schemas.md`
 
+App integration guide: `docs/app-integration-guide.md`
+
+### Hosted CK attestation
+
+```bash
+export PINS21_HOSTED_URL=https://21pins.com
+export PINS21_HOSTED_PUBLIC_KEY_HOSTED_ED25519_V1=<base64-public-key>
+
+21pins hosted status
+21pins hosted smoke --require-public-key
+21pins grant create --ck-hosted \
+  --capabilities llm.chat \
+  --data-classes public \
+  --targets openrouter
+```
+
+The hosted page verifies ConsentKeys identity and returns a signed attestation. The CLI rejects unknown hosted key IDs and invalid signatures. Use `--sub` or `--ck-whoami` for local-only grants.
+
+Hosted deployment routes live under `website/api/` and require the SQL in `docs/hosted-attestation-supabase.sql` plus Vercel env vars before `/health` reports ready:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `CONSENTKEYS_CLIENT_ID`
+- `CONSENTKEYS_CLIENT_SECRET`
+- `CONSENTKEYS_ISSUER` (defaults to `https://api.consentkeys.com`)
+- `PINS21_HOSTED_URL` (for example, `https://21pins.com`)
+- `PINS21_HOSTED_STATE_SECRET`
+- `PINS21_HOSTED_KEY_ID` (defaults to `hosted-ed25519-v1`)
+- `PINS21_HOSTED_ED25519_PRIVATE_KEY_PEM`
+
+Generate a hosted signing key with:
+
+```bash
+openssl genpkey -algorithm Ed25519 -out hosted-ed25519-private.pem
+openssl pkey -in hosted-ed25519-private.pem -pubout -out hosted-ed25519-public.pem
+openssl pkey -in hosted-ed25519-private.pem -pubout -outform DER | base64
+```
+
+Use the PEM private key as `PINS21_HOSTED_ED25519_PRIVATE_KEY_PEM`. Use the final base64 DER output as `PINS21_HOSTED_PUBLIC_KEY_HOSTED_ED25519_V1` for CLI smoke/tests. Keep the private key only in Vercel secrets.
+
 ## Env vars
 
 - `PINS21_STATE_PATH`
+- `PINS21_HOSTED_URL`
+- `PINS21_HOSTED_PUBLIC_KEY_<KEY_ID>`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`

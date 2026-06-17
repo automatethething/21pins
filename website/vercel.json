@@ -1,1 +1,11 @@
-{"cleanUrls": true, "trailingSlash": false}
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/health", "destination": "/api/health" },
+    { "source": "/v1/ck/attestation-sessions", "destination": "/api/v1/ck/attestation-sessions" },
+    { "source": "/v1/ck/attestation-sessions/:id", "destination": "/api/v1/ck/attestation-sessions/:id" },
+    { "source": "/ck/attest", "destination": "/api/ck/attest" },
+    { "source": "/ck/callback", "destination": "/api/ck/callback" }
+  ]
+}

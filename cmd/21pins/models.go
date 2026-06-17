@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,9 +19,12 @@ import (
 )
 
 type discoveredModel struct {
-	ID            string
-	Name          string
-	ContextWindow int
+	ID                              string
+	Name                            string
+	ContextWindow                   int
+	PromptPriceMicrosPerMillion     int64
+	CompletionPriceMicrosPerMillion int64
+	PricingSource                   string
 }
 
 func handleModels(st *store.Store, args []string) {
@@ -68,7 +72,14 @@ func handleModelsSync(st *store.Store, args []string) {
 		}
 		entries := make([]store.ProviderModel, 0, len(models))
 		for _, m := range models {
-			entries = append(entries, store.ProviderModel{ID: m.ID, Name: m.Name, ContextWindow: m.ContextWindow})
+			entries = append(entries, store.ProviderModel{
+				ID:                              m.ID,
+				Name:                            m.Name,
+				ContextWindow:                   m.ContextWindow,
+				PromptPriceMicrosPerMillion:     m.PromptPriceMicrosPerMillion,
+				CompletionPriceMicrosPerMillion: m.CompletionPriceMicrosPerMillion,
+				PricingSource:                   m.PricingSource,
+			})
 		}
 		if err := st.SaveModelCatalog(provider, entries); err != nil {
 			fmt.Fprintf(os.Stderr, "save catalog failed for %s: %v\n", provider, err)
@@ -221,6 +232,11 @@ func syncProviderModels(st *store.Store, provider string) ([]discoveredModel, er
 			return nil, errors.New("no key configured")
 		}
 		return fetchOpenRouterModels(key)
+	case "deepseek":
+		if key == "" {
+			return nil, errors.New("no key configured")
+		}
+		return fetchDeepSeekModels(key)
 	case "anthropic":
 		if key == "" {
 			return nil, errors.New("no key configured")
@@ -239,8 +255,12 @@ func syncProviderModels(st *store.Store, provider string) ([]discoveredModel, er
 }
 
 func fetchOpenAIModels(key string) ([]discoveredModel, error) {
-	type item struct{ ID string `json:"id"` }
-	var resp struct{ Data []item `json:"data"` }
+	type item struct {
+		ID string `json:"id"`
+	}
+	var resp struct {
+		Data []item `json:"data"`
+	}
 	if err := getJSON("https://api.openai.com/v1/models", map[string]string{"Authorization": "Bearer " + key}, &resp); err != nil {
 		return nil, err
 	}
@@ -256,14 +276,66 @@ func fetchOpenRouterModels(key string) ([]discoveredModel, error) {
 		ID            string `json:"id"`
 		Name          string `json:"name"`
 		ContextLength int    `json:"context_length"`
+		Pricing       struct {
+			Prompt     string `json:"prompt"`
+			Completion string `json:"completion"`
+		} `json:"pricing"`
 	}
-	var resp struct{ Data []item `json:"data"` }
+	var resp struct {
+		Data []item `json:"data"`
+	}
 	if err := getJSON("https://openrouter.ai/api/v1/models", map[string]string{"Authorization": "Bearer " + key}, &resp); err != nil {
 		return nil, err
 	}
 	out := make([]discoveredModel, 0, len(resp.Data))
 	for _, m := range resp.Data {
-		out = append(out, discoveredModel{ID: m.ID, Name: m.Name, ContextWindow: m.ContextLength})
+		promptPrice := parseOpenRouterPriceToMicrosPerMillion(m.Pricing.Prompt)
+		completionPrice := parseOpenRouterPriceToMicrosPerMillion(m.Pricing.Completion)
+		pricingSource := ""
+		if promptPrice > 0 && completionPrice > 0 {
+			pricingSource = "openrouter_catalog"
+		}
+		out = append(out, discoveredModel{
+			ID:                              m.ID,
+			Name:                            m.Name,
+			ContextWindow:                   m.ContextLength,
+			PromptPriceMicrosPerMillion:     promptPrice,
+			CompletionPriceMicrosPerMillion: completionPrice,
+			PricingSource:                   pricingSource,
+		})
+	}
+	return out, nil
+}
+
+func parseOpenRouterPriceToMicrosPerMillion(raw string) int64 {
+	f, err := strconv.ParseFloat(strings.TrimSpace(raw), 64)
+	if err != nil || f <= 0 {
+		return 0
+	}
+	return int64(math.Round(f * 1_000_000 * 1_000_000))
+}
+
+func fetchDeepSeekModels(key string) ([]discoveredModel, error) {
+	models, err := fetchOpenAICompatibleModels("https://api.deepseek.com/v1/models", key)
+	if err != nil {
+		return nil, err
+	}
+	return models, nil
+}
+
+func fetchOpenAICompatibleModels(endpoint, key string) ([]discoveredModel, error) {
+	type item struct {
+		ID string `json:"id"`
+	}
+	var resp struct {
+		Data []item `json:"data"`
+	}
+	if err := getJSON(endpoint, map[string]string{"Authorization": "Bearer " + key}, &resp); err != nil {
+		return nil, err
+	}
+	out := make([]discoveredModel, 0, len(resp.Data))
+	for _, m := range resp.Data {
+		out = append(out, discoveredModel{ID: m.ID, Name: m.ID})
 	}
 	return out, nil
 }
@@ -273,7 +345,9 @@ func fetchAnthropicModels(key string) ([]discoveredModel, error) {
 		ID          string `json:"id"`
 		DisplayName string `json:"display_name"`
 	}
-	var resp struct{ Data []item `json:"data"` }
+	var resp struct {
+		Data []item `json:"data"`
+	}
 	headers := map[string]string{"x-api-key": key, "anthropic-version": "2023-06-01"}
 	if err := getJSON("https://api.anthropic.com/v1/models", headers, &resp); err != nil {
 		return nil, err
@@ -295,7 +369,9 @@ func fetchGeminiModels(key string) ([]discoveredModel, error) {
 		DisplayName     string `json:"displayName"`
 		InputTokenLimit int    `json:"inputTokenLimit"`
 	}
-	var resp struct{ Models []item `json:"models"` }
+	var resp struct {
+		Models []item `json:"models"`
+	}
 	u := "https://generativelanguage.googleapis.com/v1beta/models?key=" + url.QueryEscape(key)
 	if err := getJSON(u, nil, &resp); err != nil {
 		return nil, err
@@ -313,8 +389,12 @@ func fetchGeminiModels(key string) ([]discoveredModel, error) {
 }
 
 func fetchOllamaModels() ([]discoveredModel, error) {
-	type item struct{ Name string `json:"name"` }
-	var resp struct{ Models []item `json:"models"` }
+	type item struct {
+		Name string `json:"name"`
+	}
+	var resp struct {
+		Models []item `json:"models"`
+	}
 	if err := getJSON("http://127.0.0.1:11434/api/tags", nil, &resp); err != nil {
 		return nil, err
 	}

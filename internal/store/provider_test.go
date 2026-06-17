@@ -12,6 +12,16 @@ func TestCanonicalProviderAlias(t *testing.T) {
 	}
 }
 
+func TestCanonicalProviderDeepSeekAlias(t *testing.T) {
+	canonical, aliasUsed := CanonicalProvider("deepseek.com")
+	if canonical != "deepseek" {
+		t.Fatalf("expected deepseek, got %s", canonical)
+	}
+	if !aliasUsed {
+		t.Fatal("expected aliasUsed true")
+	}
+}
+
 func TestCanonicalProviderUnknown(t *testing.T) {
 	canonical, aliasUsed := CanonicalProvider("weird-provider")
 	if canonical != "weird-provider" {
@@ -24,7 +34,7 @@ func TestCanonicalProviderUnknown(t *testing.T) {
 
 func TestSupportedProvidersContainsCoreSet(t *testing.T) {
 	got := SupportedProviders()
-	required := []string{"openai", "openrouter", "anthropic", "gemini", "ollama"}
+	required := []string{"openai", "openrouter", "anthropic", "deepseek", "gemini", "ollama"}
 	for _, r := range required {
 		found := false
 		for _, p := range got {

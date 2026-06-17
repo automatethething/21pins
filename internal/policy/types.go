@@ -10,15 +10,28 @@ const (
 	GrantStatusExpired GrantStatus = "expired"
 )
 
+type IdentityAttestation struct {
+	ID        string    `json:"attestation_id"`
+	Subject   string    `json:"subject"`
+	Issuer    string    `json:"issuer"`
+	Audience  string    `json:"audience"`
+	Method    string    `json:"method"`
+	IssuedAt  time.Time `json:"issued_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+	KeyID     string    `json:"key_id"`
+	Signature string    `json:"signature"`
+}
+
 type Grant struct {
-	ID          string      `json:"grant_id"`
-	Sub         string      `json:"sub"`
-	Status      GrantStatus `json:"status"`
-	DelegatedBy string      `json:"delegated_by,omitempty"`
-	Pins        Pins        `json:"pins"`
-	CreatedAt   time.Time   `json:"created_at"`
-	UpdatedAt   time.Time   `json:"updated_at"`
-	RevokedAt   *time.Time  `json:"revoked_at,omitempty"`
+	ID                  string               `json:"grant_id"`
+	Sub                 string               `json:"sub"`
+	Status              GrantStatus          `json:"status"`
+	DelegatedBy         string               `json:"delegated_by,omitempty"`
+	Pins                Pins                 `json:"pins"`
+	CreatedAt           time.Time            `json:"created_at"`
+	UpdatedAt           time.Time            `json:"updated_at"`
+	RevokedAt           *time.Time           `json:"revoked_at,omitempty"`
+	IdentityAttestation *IdentityAttestation `json:"identity_attestation,omitempty"`
 }
 
 type Pins struct {
@@ -96,20 +109,21 @@ type EvaluationResult struct {
 }
 
 type Receipt struct {
-	ID          string               `json:"receipt_id"`
-	GrantID     string               `json:"grant_id"`
-	Sub         string               `json:"sub"`
-	Authority   []string             `json:"authority_chain"`
-	PinStates   map[string]PinStatus `json:"pin_states"`
-	Decision    Decision             `json:"decision"`
-	Capability  string               `json:"capability"`
-	DataClass   string               `json:"data_class"`
-	Target      string               `json:"target"`
-	CostCents   int64                `json:"cost_cents"`
-	ApprovalRef string               `json:"approval_ref,omitempty"`
-	CreatedAt   time.Time            `json:"created_at"`
-	KeyID       string               `json:"key_id,omitempty"`
-	Signature   string               `json:"signature,omitempty"`
+	ID                    string               `json:"receipt_id"`
+	GrantID               string               `json:"grant_id"`
+	Sub                   string               `json:"sub"`
+	Authority             []string             `json:"authority_chain"`
+	PinStates             map[string]PinStatus `json:"pin_states"`
+	Decision              Decision             `json:"decision"`
+	Capability            string               `json:"capability"`
+	DataClass             string               `json:"data_class"`
+	Target                string               `json:"target"`
+	CostCents             int64                `json:"cost_cents"`
+	ApprovalRef           string               `json:"approval_ref,omitempty"`
+	IdentityAttestationID string               `json:"identity_attestation_id,omitempty"`
+	CreatedAt             time.Time            `json:"created_at"`
+	KeyID                 string               `json:"key_id,omitempty"`
+	Signature             string               `json:"signature,omitempty"`
 }
 
 type GrantExportPayload struct {
@@ -141,6 +155,7 @@ type ApprovalRequest struct {
 	Status      ApprovalStatus `json:"status"`
 	RequestedAt time.Time      `json:"requested_at"`
 	ResolvedAt  *time.Time     `json:"resolved_at,omitempty"`
-	ApproverSub string         `json:"approver_sub,omitempty"`
-	Reason      string         `json:"reason,omitempty"`
+	ApproverSub         string               `json:"approver_sub,omitempty"`
+	ApproverAttestation *IdentityAttestation `json:"approver_attestation,omitempty"`
+	Reason              string               `json:"reason,omitempty"`
 }
