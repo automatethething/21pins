@@ -1066,6 +1066,7 @@
             <span class="provider-chip">anthropic</span>
             <span class="provider-chip">deepseek</span>
             <span class="provider-chip">openrouter</span>
+            <span class="provider-chip">venice</span>
             <span class="provider-chip">gemini</span>
             <span class="provider-chip">ollama</span>
           </div>
@@ -1083,8 +1084,8 @@
       <div class="stat-desc">checked before every model call</div>
     </div>
     <div class="stat-item">
-      <div class="stat-num"><span>6</span> providers</div>
-      <div class="stat-desc">ready today: OpenAI, Anthropic, OpenRouter, Gemini, Ollama</div>
+      <div class="stat-num"><span>7</span> providers</div>
+      <div class="stat-desc">ready today: OpenAI, Anthropic, DeepSeek, OpenRouter, Venice, Gemini, Ollama</div>
     </div>
     <div class="stat-item">
       <div class="stat-num">1 endpoint</div>
@@ -1165,6 +1166,7 @@
           <span class="cmd">21pins</span> key set <span class="arg">anthropic</span> <span class="flag">--value</span> <span class="arg">"$ANTHROPIC_API_KEY"</span><br>
           <span class="cmd">21pins</span> key set <span class="arg">deepseek</span> <span class="flag">--value</span> <span class="arg">"$DEEPSEEK_API_KEY"</span><br>
           <span class="cmd">21pins</span> key set <span class="arg">openrouter</span> <span class="flag">--value</span> <span class="arg">"$OR_KEY"</span><br>
+          <span class="cmd">21pins</span> key set <span class="arg">venice</span> <span class="flag">--value</span> <span class="arg">"$VENICE_API_KEY"</span><br>
           <span class="cmd">21pins</span> key set <span class="arg">gemini</span> <span class="flag">--value</span> <span class="arg">"$GEMINI_KEY"</span>
         </div>
       </div>
@@ -1299,6 +1301,7 @@
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">anthropic</span>    <span class="c-flag">--value</span> <span class="c-string">"$ANTHROPIC_API_KEY"</span></span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">deepseek</span>     <span class="c-flag">--value</span> <span class="c-string">"$DEEPSEEK_API_KEY"</span></span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">openrouter</span>   <span class="c-flag">--value</span> <span class="c-string">"$OR_KEY"</span></span>
+<span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">venice</span>       <span class="c-flag">--value</span> <span class="c-string">"$VENICE_API_KEY"</span></span>
 <span class="c-prompt">$ </span><span class="c-cmd">./21pins key set <span class="c-flag">gemini</span>       <span class="c-flag">--value</span> <span class="c-string">"$GEMINI_KEY"</span></span>
 <span class="c-blank"></span>
 <span class="c-comment"># 4. Create an app token</span>
@@ -1332,8 +1335,16 @@
       <small>gpt-4o, o3, o4-mini…</small>
     </div>
     <div class="provider-item">
+      DeepSeek
+      <small>deepseek-chat, reasoner…</small>
+    </div>
+    <div class="provider-item">
       OpenRouter
       <small>500+ models via one key</small>
+    </div>
+    <div class="provider-item">
+      Venice
+      <small>privacy-first models via one key</small>
     </div>
     <div class="provider-item">
       Gemini

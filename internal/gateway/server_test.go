@@ -181,6 +181,58 @@ func TestRedactURLForLogHidesQueryAPIKeys(t *testing.T) {
 	}
 }
 
+func TestGatewayRecordsVeniceUsageAndProviderCost(t *testing.T) {
+	upstreamBody := `{"id":"chatcmpl_1","model":"venice-uncensored-1-2","usage":{"prompt_tokens":1000,"completion_tokens":50,"total_tokens":1050},"cost":{"usd":0.000245,"diem":0},"choices":[{"message":{"role":"assistant","content":"pong"}}]}`
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/chat/completions" {
+			t.Fatalf("bad path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer venice-key" {
+			t.Fatalf("missing venice auth header")
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("bad upstream payload: %v", err)
+		}
+		if payload["model"] != "venice-uncensored-1-2" {
+			t.Fatalf("bad model payload: %#v", payload["model"])
+		}
+		params, _ := payload["venice_parameters"].(map[string]any)
+		if params["include_venice_system_prompt"] != false || params["enable_web_search"] != "off" {
+			t.Fatalf("expected cheap venice defaults, got %#v", params)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(upstreamBody))
+	}))
+	defer upstream.Close()
+
+	s, _ := store.New(filepath.Join(t.TempDir(), "state.json"))
+	_ = s.SetProviderKey("venice", "venice-key")
+	token, _ := s.CreateToken("pi", []string{"proxy:chat", "usage:read"})
+	g := NewServer(s, Config{VeniceBaseURL: upstream.URL})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{"model":"venice/venice-uncensored-1-2","messages":[{"role":"user","content":"ping"}]}`))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	events := s.ListUsageEvents()
+	if len(events) != 1 {
+		t.Fatalf("expected 1 usage event, got %d", len(events))
+	}
+	event := events[0]
+	if event.Provider != "venice" || event.Model != "venice-uncensored-1-2" || event.RequestedModel != "venice/venice-uncensored-1-2" {
+		t.Fatalf("bad event identity: %+v", event)
+	}
+	if event.EstimatedCostMicros != 245 || event.PricingSource != "provider_response" {
+		t.Fatalf("bad provider cost: %+v", event)
+	}
+}
+
 func TestGatewayRecordsOpenRouterUsageForPiToken(t *testing.T) {
 	upstreamBody := `{"id":"gen_123","model":"openai/gpt-4o-mini","usage":{"prompt_tokens":1000,"completion_tokens":200,"total_tokens":1200},"choices":[{"message":{"role":"assistant","content":"pong"}}]}`
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

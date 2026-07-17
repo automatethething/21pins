@@ -54,6 +54,7 @@ go build -o 21pins ./cmd/21pins
 ./21pins key set openrouter --value "$OPENROUTER_API_KEY"
 ./21pins key set anthropic --value "$ANTHROPIC_API_KEY"
 ./21pins key set deepseek --value "$DEEPSEEK_API_KEY"
+./21pins key set venice --value "$VENICE_API_KEY"
 ./21pins key set gemini --value "$GEMINI_API_KEY"
 # ollama usually does not need an API key
 ```
@@ -63,10 +64,11 @@ Canonical provider names are:
 - `openrouter`
 - `anthropic`
 - `deepseek`
+- `venice`
 - `gemini`
 - `ollama`
 
-Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`, `deepseek.com` -> `deepseek`).
+Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`, `deepseek.com` -> `deepseek`, `venice.ai` -> `venice`).
 
 ### Optional: rotate keys safely
 
@@ -85,7 +87,7 @@ Use `--keep-previous-hours 0` for immediate old-key revocation.
 
 ```bash
 ./21pins models sync
-./21pins models list --provider openrouter --search gemini
+./21pins models list --provider venice --search llama
 ./21pins models choose --provider openrouter --search gpt
 ```
 

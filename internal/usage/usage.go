@@ -3,6 +3,7 @@ package usage
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"strings"
 )
 
@@ -14,6 +15,8 @@ type ParsedUsage struct {
 	CacheReadTokens  int64
 	CacheWriteTokens int64
 	TotalTokens      int64
+	CostMicros       int64
+	CostSource       string
 	Warning          string
 }
 
@@ -33,6 +36,7 @@ type chatUsageEnvelope struct {
 	ID     string         `json:"id"`
 	Model  string         `json:"model"`
 	Usage  map[string]any `json:"usage"`
+	Cost   map[string]any `json:"cost"`
 	Object string         `json:"object"`
 }
 
@@ -61,6 +65,10 @@ func ParseChatUsage(body []byte) (ParsedUsage, bool) {
 		if cached := intFromMap(details, "cached_tokens"); cached > 0 {
 			parsed.CacheReadTokens = cached
 		}
+	}
+	if usd := floatFromMap(env.Cost, "usd"); usd > 0 {
+		parsed.CostMicros = int64(math.Round(usd * 1_000_000))
+		parsed.CostSource = "provider_response"
 	}
 	if parsed.PromptTokens == 0 && parsed.CompletionTokens == 0 && parsed.TotalTokens == 0 {
 		parsed.Warning = "usage_tokens_missing"
@@ -119,6 +127,30 @@ func MergeStreamOptionsIncludeUsage(payload map[string]any) {
 	}
 	existing["include_usage"] = true
 	payload["stream_options"] = existing
+}
+
+func floatFromMap(m map[string]any, keys ...string) float64 {
+	if m == nil {
+		return 0
+	}
+	for _, key := range keys {
+		v, ok := m[key]
+		if !ok {
+			continue
+		}
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int64:
+			return float64(n)
+		case int:
+			return float64(n)
+		case json.Number:
+			out, _ := n.Float64()
+			return out
+		}
+	}
+	return 0
 }
 
 func intFromMap(m map[string]any, keys ...string) int64 {

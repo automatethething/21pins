@@ -80,6 +80,17 @@ func TestEvaluateWithApprovalStoresApprovalRefOnReceipt(t *testing.T) {
 	}
 }
 
+func TestSyncProviderModelsRecognizesVenice(t *testing.T) {
+	st, err := store.New(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = syncProviderModels(st, "venice")
+	if err == nil || err.Error() != "no key configured" {
+		t.Fatalf("expected venice to be recognized but missing key, got %v", err)
+	}
+}
+
 func TestParseOpenRouterPricing(t *testing.T) {
 	price := parseOpenRouterPriceToMicrosPerMillion("0.00000015")
 	if price != 150_000 {

@@ -735,12 +735,14 @@ func tokenHash(raw string) string {
 	return hex.EncodeToString(h[:])
 }
 
-var supportedProviders = []string{"anthropic", "deepseek", "gemini", "ollama", "openai", "openrouter"}
+var supportedProviders = []string{"anthropic", "deepseek", "gemini", "ollama", "openai", "openrouter", "venice"}
 
 var providerAliases = map[string]string{
 	"deepseek.com":       "deepseek",
 	"deepseek-ai":        "deepseek",
 	"openrouter.ai":      "openrouter",
+	"api.venice.ai":      "venice",
+	"venice.ai":          "venice",
 	"google":             "gemini",
 	"google-ai-studio":   "gemini",
 	"googleaistudio":     "gemini",

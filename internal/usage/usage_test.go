@@ -26,6 +26,17 @@ func TestParseChatCompletionUsageMissingUsage(t *testing.T) {
 	}
 }
 
+func TestParseChatCompletionUsageCostUSD(t *testing.T) {
+	body := []byte(`{"id":"chatcmpl_1","model":"venice-uncensored-1-2","usage":{"prompt_tokens":1000,"completion_tokens":200,"total_tokens":1200},"cost":{"usd":0.0003549,"diem":0}}`)
+	parsed, ok := ParseChatUsage(body)
+	if !ok {
+		t.Fatal("expected usage")
+	}
+	if parsed.CostMicros != 355 || parsed.CostSource != "provider_response" {
+		t.Fatalf("expected rounded provider cost, got %+v", parsed)
+	}
+}
+
 func TestParseChatCompletionUsageCacheTokenDetailVariants(t *testing.T) {
 	body := []byte(`{"id":"gen_123","model":"openai/gpt-4o-mini","usage":{"prompt_tokens":100,"completion_tokens":20,"total_tokens":120,"prompt_tokens_details":{"cached_tokens":30},"cache_creation_input_tokens":7}}`)
 	parsed, ok := ParseChatUsage(body)

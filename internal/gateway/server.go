@@ -28,6 +28,7 @@ type Config struct {
 	AnthropicBaseURL  string
 	DeepSeekBaseURL   string
 	GeminiBaseURL     string
+	VeniceBaseURL     string
 }
 
 type Server struct {
@@ -54,6 +55,9 @@ func NewServer(st *store.Store, cfg Config) *Server {
 	}
 	if cfg.GeminiBaseURL == "" {
 		cfg.GeminiBaseURL = "https://generativelanguage.googleapis.com"
+	}
+	if cfg.VeniceBaseURL == "" {
+		cfg.VeniceBaseURL = "https://api.venice.ai"
 	}
 
 	s := &Server{store: st, cfg: cfg}
@@ -168,6 +172,9 @@ func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) 
 	if provider == "openrouter" && streaming {
 		usage.MergeStreamOptionsIncludeUsage(payload)
 	}
+	if provider == "venice" {
+		applyVeniceCheapDefaults(payload)
+	}
 	newBody, _ := json.Marshal(payload)
 
 	target := ""
@@ -180,6 +187,8 @@ func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) 
 		target = strings.TrimRight(s.cfg.DeepSeekBaseURL, "/") + "/v1/chat/completions"
 	case "ollama":
 		target = strings.TrimRight(s.cfg.OllamaBaseURL, "/") + "/v1/chat/completions"
+	case "venice":
+		target = strings.TrimRight(s.cfg.VeniceBaseURL, "/") + "/api/v1/chat/completions"
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "provider not supported on openai-compatible endpoint"})
 		return
@@ -190,7 +199,7 @@ func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if provider == "openrouter" {
+	if provider == "openrouter" || provider == "venice" {
 		var result bufferedResponse
 		var err error
 		if streaming {
@@ -208,7 +217,7 @@ func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		if result.StatusCode >= 200 && result.StatusCode < 300 {
-			s.recordOpenRouterUsage(r, result, requestedModel, providerModel, receiptID)
+			s.recordProviderUsage(r, result, provider, requestedModel, providerModel, receiptID)
 		}
 		return
 	}
@@ -456,6 +465,8 @@ func (s *Server) providerBase(provider string) (string, error) {
 		return s.cfg.DeepSeekBaseURL, nil
 	case "gemini":
 		return s.cfg.GeminiBaseURL, nil
+	case "venice":
+		return s.cfg.VeniceBaseURL, nil
 	default:
 		return "", fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -491,7 +502,7 @@ func (s *Server) providerRequest(provider, target, method string, incoming http.
 	}
 	req.Header.Set("Content-Type", incoming.Get("Content-Type"))
 	switch provider {
-	case "openai", "openrouter", "deepseek":
+	case "openai", "openrouter", "deepseek", "venice":
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	case "anthropic":
 		req.Header.Set("x-api-key", apiKey)
@@ -574,7 +585,21 @@ func writeBufferedResponse(w http.ResponseWriter, result bufferedResponse) {
 	_, _ = w.Write(result.Body)
 }
 
-func (s *Server) recordOpenRouterUsage(r *http.Request, result bufferedResponse, requestedModel, providerModel, receiptID string) {
+func applyVeniceCheapDefaults(payload map[string]any) {
+	params, _ := payload["venice_parameters"].(map[string]any)
+	if params == nil {
+		params = map[string]any{}
+	}
+	if _, ok := params["include_venice_system_prompt"]; !ok {
+		params["include_venice_system_prompt"] = false
+	}
+	if _, ok := params["enable_web_search"]; !ok {
+		params["enable_web_search"] = "off"
+	}
+	payload["venice_parameters"] = params
+}
+
+func (s *Server) recordProviderUsage(r *http.Request, result bufferedResponse, provider, requestedModel, providerModel, receiptID string) {
 	var parsed usage.ParsedUsage
 	var ok bool
 	if strings.Contains(strings.ToLower(result.Header.Get("Content-Type")), "text/event-stream") {
@@ -593,8 +618,19 @@ func (s *Server) recordOpenRouterUsage(r *http.Request, result bufferedResponse,
 	if parsed.Warning != "" && parsed.PromptTokens == 0 && parsed.CompletionTokens == 0 && parsed.TotalTokens == 0 {
 		cost = usage.CostEstimate{Micros: 0, Source: "unknown", Currency: "USD"}
 	} else {
-		price := s.catalogUsagePrice("openrouter", model)
-		cost = usage.EstimateOpenRouterCostMicros(model, parsed.PromptTokens, parsed.CompletionTokens, price)
+		if parsed.CostMicros > 0 {
+			cost = usage.CostEstimate{Micros: parsed.CostMicros, Source: parsed.CostSource, Currency: "USD"}
+		} else if provider == "openrouter" {
+			price := s.catalogUsagePrice("openrouter", model)
+			cost = usage.EstimateOpenRouterCostMicros(model, parsed.PromptTokens, parsed.CompletionTokens, price)
+		} else {
+			price := s.catalogUsagePrice(provider, model)
+			if price != nil {
+				cost = usage.CostEstimate{Micros: (parsed.PromptTokens*price.PromptMicrosPerMillion + parsed.CompletionTokens*price.CompletionMicrosPerMillion) / 1_000_000, Source: price.Source, Currency: "USD"}
+			} else {
+				cost = usage.CostEstimate{Micros: 0, Source: "unknown", Currency: "USD"}
+			}
+		}
 	}
 	appTokenName := ""
 	if record, valid := s.store.ValidateTokenRecord(bearerToken(r.Header.Get("Authorization")), "proxy:chat"); valid {
@@ -603,7 +639,7 @@ func (s *Server) recordOpenRouterUsage(r *http.Request, result bufferedResponse,
 	_ = s.store.AddUsageEvent(store.UsageEvent{
 		CreatedAt:           time.Now().UTC(),
 		Source:              sourceForTokenName(appTokenName),
-		Provider:            "openrouter",
+		Provider:            provider,
 		Model:               model,
 		RequestedModel:      requestedModel,
 		AppTokenName:        appTokenName,

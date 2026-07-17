@@ -237,6 +237,11 @@ func syncProviderModels(st *store.Store, provider string) ([]discoveredModel, er
 			return nil, errors.New("no key configured")
 		}
 		return fetchDeepSeekModels(key)
+	case "venice":
+		if key == "" {
+			return nil, errors.New("no key configured")
+		}
+		return fetchVeniceModels(key)
 	case "anthropic":
 		if key == "" {
 			return nil, errors.New("no key configured")
@@ -321,6 +326,10 @@ func fetchDeepSeekModels(key string) ([]discoveredModel, error) {
 		return nil, err
 	}
 	return models, nil
+}
+
+func fetchVeniceModels(key string) ([]discoveredModel, error) {
+	return fetchOpenAICompatibleModels("https://api.venice.ai/api/v1/models", key)
 }
 
 func fetchOpenAICompatibleModels(endpoint, key string) ([]discoveredModel, error) {

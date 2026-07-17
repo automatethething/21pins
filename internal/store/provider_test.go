@@ -34,7 +34,7 @@ func TestCanonicalProviderUnknown(t *testing.T) {
 
 func TestSupportedProvidersContainsCoreSet(t *testing.T) {
 	got := SupportedProviders()
-	required := []string{"openai", "openrouter", "anthropic", "deepseek", "gemini", "ollama"}
+	required := []string{"openai", "openrouter", "anthropic", "deepseek", "gemini", "ollama", "venice"}
 	for _, r := range required {
 		found := false
 		for _, p := range got {
