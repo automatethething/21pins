@@ -1,5 +1,7 @@
 # 21pins CLI (Go)
 
+[![test](https://github.com/automatethething/21pins/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/automatethething/21pins/actions/workflows/test.yml)
+
 Local-first CLI + localhost gateway for managing LLM provider keys in one place and using them from apps/agents without embedding provider keys everywhere.
 
 > Repo note: `website/` contains the static marketing site deployed to **https://21pins.com**. The CLI/gateway source of truth is `cmd/` + `internal/`.
