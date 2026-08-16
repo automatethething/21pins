@@ -264,8 +264,8 @@ func (s *Server) handleProviderPassthrough(w http.ResponseWriter, r *http.Reques
 	logUpstream := redactURLForLog(upstream)
 	log.Printf("[gateway] Proxying %s request to %s (provider: %s)\n", r.Method, logUpstream, provider)
 	if err := s.forwardRequest(provider, upstream, r.Method, r.Header, body, w); err != nil {
-		log.Printf("[gateway] Error proxying request to %s: %v\n", logUpstream, err)
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+		log.Printf("[gateway] Error proxying request to %s\n", logUpstream)
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "upstream request failed"})
 		return
 	}
 	log.Printf("[gateway] Successfully proxied %s request to %s\n", r.Method, logUpstream)
@@ -274,7 +274,7 @@ func (s *Server) handleProviderPassthrough(w http.ResponseWriter, r *http.Reques
 func redactURLForLog(raw string) string {
 	parsed, err := url.Parse(raw)
 	if err != nil {
-		return raw
+		return "[redacted URL]"
 	}
 	query := parsed.Query()
 	for _, key := range []string{"key", "api_key", "apikey", "access_token", "token"} {

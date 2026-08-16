@@ -414,6 +414,28 @@ func fetchOllamaModels() ([]discoveredModel, error) {
 	return out, nil
 }
 
+func redactRequestError(err error) error {
+	var urlErr *url.Error
+	if !errors.As(err, &urlErr) {
+		return err
+	}
+	redacted := *urlErr
+	parsed, parseErr := url.Parse(redacted.URL)
+	if parseErr != nil {
+		redacted.URL = "[redacted URL]"
+	} else {
+		query := parsed.Query()
+		for _, key := range []string{"key", "api_key", "apikey", "access_token", "token"} {
+			if query.Has(key) {
+				query.Set(key, "REDACTED")
+			}
+		}
+		parsed.RawQuery = query.Encode()
+		redacted.URL = parsed.String()
+	}
+	return &redacted
+}
+
 func getJSON(url string, headers map[string]string, out any) error {
 	client := &http.Client{Timeout: 20 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
@@ -425,7 +447,7 @@ func getJSON(url string, headers map[string]string, out any) error {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return redactRequestError(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

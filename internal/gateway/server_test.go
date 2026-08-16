@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -178,6 +179,51 @@ func TestRedactURLForLogHidesQueryAPIKeys(t *testing.T) {
 	}
 	if parsed.Query().Get("key") != "REDACTED" || parsed.Query().Get("alt") != "sse" {
 		t.Fatalf("unexpected redacted URL: %s", got)
+	}
+}
+
+func TestRedactURLForLogFailsClosed(t *testing.T) {
+	const secret = "gemini-sensitive-sentinel"
+	got := redactURLForLog("https://example.invalid/%zz?key=" + secret)
+	if strings.Contains(got, secret) {
+		t.Fatal("malformed URL leaked query secret")
+	}
+}
+
+func TestGatewayGeminiTransportErrorDoesNotLeakAPIKey(t *testing.T) {
+	upstream := httptest.NewServer(http.NotFoundHandler())
+	upstreamURL := upstream.URL
+	upstream.Close()
+
+	s, err := store.New(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const secret = "gemini-sensitive-sentinel"
+	if err := s.SetProviderKey("gemini", secret); err != nil {
+		t.Fatal(err)
+	}
+	token, err := s.CreateToken("web", []string{"proxy:providers"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var logs bytes.Buffer
+	oldLogOutput := log.Writer()
+	log.SetOutput(&logs)
+	t.Cleanup(func() { log.SetOutput(oldLogOutput) })
+
+	g := NewServer(s, Config{GeminiBaseURL: upstreamURL})
+	req := httptest.NewRequest(http.MethodGet, "/v1/providers/gemini/v1beta/models", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("expected 502, got %d", w.Code)
+	}
+	if combined := logs.String() + w.Body.String(); strings.Contains(combined, secret) {
+		t.Fatal("Gemini API key leaked through transport error")
 	}
 }
 

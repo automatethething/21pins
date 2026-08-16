@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,6 +80,22 @@ func TestEvaluateWithApprovalStoresApprovalRefOnReceipt(t *testing.T) {
 	receipts := st.ListReceipts(grant.ID)
 	if len(receipts) != 1 || receipts[0].ApprovalRef != approval.ID {
 		t.Fatalf("expected receipt approval ref %q, got %#v", approval.ID, receipts)
+	}
+}
+
+func TestGetJSONTransportErrorDoesNotLeakQuerySecret(t *testing.T) {
+	upstream := httptest.NewServer(http.NotFoundHandler())
+	upstreamURL := upstream.URL
+	upstream.Close()
+
+	const secret = "gemini-sensitive-sentinel"
+	var out any
+	err := getJSON(upstreamURL+"/models?key="+secret, nil, &out)
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatal("query secret leaked through transport error")
 	}
 }
 
