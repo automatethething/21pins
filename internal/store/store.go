@@ -121,13 +121,16 @@ func (s *Store) loadOrInit() error {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 
-	_, err := os.Stat(s.path)
-	if errors.Is(err, os.ErrNotExist) {
+	exists, err := validateStatePath(s.path)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		s.state = State{ProviderKeys: map[string]string{}, ProviderKeySets: map[string]ProviderKeySet{}, ModelCatalogs: map[string]ModelCatalog{}, Tokens: []TokenRecord{}}
 		return s.saveLocked()
 	}
-	if err != nil {
-		return err
+	if err := os.Chmod(s.path, 0o600); err != nil {
+		return fmt.Errorf("secure state file: %w", err)
 	}
 
 	if err := s.reloadLocked(); err != nil {
@@ -141,6 +144,20 @@ func (s *Store) loadOrInit() error {
 	return nil
 }
 
+func validateStatePath(path string) (bool, error) {
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return false, errors.New("state path must be a regular file, not a symlink")
+	}
+	return true, nil
+}
+
 func (s *Store) reloadLocked() error {
 	b, err := os.ReadFile(s.path)
 	if err != nil {
@@ -152,9 +169,11 @@ func (s *Store) reloadLocked() error {
 		return nil
 	}
 
-	if err := json.Unmarshal(b, &s.state); err != nil {
+	var state State
+	if err := json.Unmarshal(b, &state); err != nil {
 		return fmt.Errorf("parse state file: %w", err)
 	}
+	s.state = state
 	if s.state.ProviderKeys == nil {
 		s.state.ProviderKeys = map[string]string{}
 	}
@@ -214,12 +233,55 @@ func (s *Store) migrateProviderKeysLocked() bool {
 }
 
 func (s *Store) saveLocked() error {
-	b, err := json.MarshalIndent(s.state, "", "  ")
+	exists, err := validateStatePath(s.path)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(s.path, b, 0o600); err != nil {
-		return err
+	rollback := func(saveErr error) error {
+		if exists {
+			if reloadErr := s.reloadLocked(); reloadErr != nil {
+				return fmt.Errorf("%w; restore state after failed save: %v", saveErr, reloadErr)
+			}
+		}
+		return saveErr
+	}
+	b, err := json.MarshalIndent(s.state, "", "  ")
+	if err != nil {
+		return rollback(err)
+	}
+
+	dirPath := filepath.Dir(s.path)
+	temp, err := os.CreateTemp(dirPath, "."+filepath.Base(s.path)+".tmp-")
+	if err != nil {
+		return rollback(err)
+	}
+	tempPath := temp.Name()
+	closed := false
+	defer func() {
+		if !closed {
+			_ = temp.Close()
+		}
+		_ = os.Remove(tempPath)
+	}()
+	if err := temp.Chmod(0o600); err != nil {
+		return rollback(err)
+	}
+	if _, err := temp.Write(b); err != nil {
+		return rollback(err)
+	}
+	if err := temp.Sync(); err != nil {
+		return rollback(err)
+	}
+	if err := temp.Close(); err != nil {
+		return rollback(err)
+	}
+	closed = true
+	if err := os.Rename(tempPath, s.path); err != nil {
+		return rollback(err)
+	}
+	if dir, err := os.Open(dirPath); err == nil {
+		_ = dir.Sync()
+		_ = dir.Close()
 	}
 	return nil
 }

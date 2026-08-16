@@ -242,7 +242,7 @@ The gateway can enforce the same grant policy on live proxy requests. Add these 
 
 ## Security notes
 
-- v1 is local-file storage (`0600`) + per-app access tokens.
+- v1 is local-file storage (enforced `0600`) + per-app access tokens. Writes atomically replace the state file; separate concurrent 21pins processes are not cross-process locked and remain last-writer-wins.
 - Gateway listens on `127.0.0.1` by default.
 - You can opt into LAN access with `serve --host 0.0.0.0`.
 - Canonical grant IDs are the revocation/audit source of truth.

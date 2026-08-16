@@ -45,6 +45,101 @@ func TestStorePersistsUsageEvents(t *testing.T) {
 	}
 }
 
+func TestStoreAtomicallyReplacesStateFile(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	s, err := New(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.Stat(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetProviderKey("openai", "test-key"); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if os.SameFile(before, after) {
+		t.Fatal("state save replaced file contents in place instead of atomically replacing it")
+	}
+}
+
+func TestStoreTightensExistingStateFilePermissions(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "state.json")
+	if err := os.WriteFile(statePath, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(statePath); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("expected existing state file to be tightened to 0600, got %o", info.Mode().Perm())
+	}
+}
+
+func TestStoreRollsBackMemoryAfterFailedSave(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.json")
+	s, err := New(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(tempDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(tempDir, 0o700) })
+	if err := s.SetProviderKey("openai", "must-not-stick"); err == nil {
+		t.Fatal("expected save to fail in read-only directory")
+	}
+	if got := s.GetProviderKey("openai"); got != "" {
+		t.Fatalf("failed save remained in memory: %q", got)
+	}
+}
+
+func TestStoreRollsBackMemoryAfterMarshalFailure(t *testing.T) {
+	s, err := New(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := UsageEvent{ID: "invalid-time", CreatedAt: time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)}
+	if err := s.AddUsageEvent(event); err == nil {
+		t.Fatal("expected JSON marshal failure")
+	}
+	if events := s.ListUsageEvents(); len(events) != 0 {
+		t.Fatalf("failed save left %d usage events in memory", len(events))
+	}
+}
+
+func TestStoreRejectsSymlinkStatePath(t *testing.T) {
+	tempDir := t.TempDir()
+	target := filepath.Join(tempDir, "target.json")
+	statePath := filepath.Join(tempDir, "state.json")
+	const original = `{"provider_keys":{"openai":"do-not-overwrite"}}`
+	if err := os.WriteFile(target, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, statePath); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(statePath); err == nil {
+		t.Fatal("expected symlink state path to be rejected")
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != original {
+		t.Fatal("symlink target was modified")
+	}
+}
+
 func TestValidateTokenRecordReturnsTokenName(t *testing.T) {
 	s, err := New(filepath.Join(t.TempDir(), "state.json"))
 	if err != nil {
