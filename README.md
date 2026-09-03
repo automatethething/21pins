@@ -37,6 +37,13 @@ Providers wired:
 - Gemini
 - Ollama
 
+## Prerequisites 
+
+```bash
+sudo apt update
+sudo apt install -y git golang-go ca-certificates
+```
+
 ## Install (local build)
 
 ```bash
