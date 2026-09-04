@@ -1,10 +1,27 @@
 {
   "name": "@privacyguy/21pins-darwin-arm64",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "macOS arm64 binary for 21pins.",
-  "license": "UNLICENSED",
-  "os": ["darwin"],
-  "cpu": ["arm64"],
-  "files": ["bin/21pins"],
-  "preferUnplugged": true
+  "license": "MIT",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/21pins"
+  ],
+  "preferUnplugged": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/automatethething/21pins.git"
+  },
+  "homepage": "https://21pins.com",
+  "bugs": {
+    "url": "https://github.com/automatethething/21pins/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }

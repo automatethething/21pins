@@ -378,6 +378,10 @@ If you set `PINS21_STATE_PATH`, back up that file instead. Safe Linux pre-upgrad
 cp ~/.config/21pins/state.json ~/.config/21pins/state.backup.$(date +%Y%m%d%H%M%S).json
 ```
 
+## License
+
+MIT. See `LICENSE`.
+
 ## Env vars
 
 - `PINS21_STATE_PATH`

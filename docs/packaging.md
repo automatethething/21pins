@@ -35,7 +35,7 @@ Do not publish releases, push tags, or publish packages without owner approval. 
 
 ```bash
 cd npm
-npm run check:tag -- v0.1.0
+npm run check:tag -- v0.1.1
 ```
 
 ## Homebrew
@@ -88,7 +88,7 @@ For an approved npm release, publish all four platform packages first, then publ
 
 ```bash
 cd npm
-npm run check:tag -- v0.1.0
+npm run check:tag -- v0.1.1
 npm run prepare:platforms
 npm run pack:platforms
 (cd platforms/darwin-arm64 && npm publish --access public)
