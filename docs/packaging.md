@@ -53,8 +53,11 @@ Install path:
 ```bash
 brew tap automatethething/tap
 brew trust automatethething/tap
+brew search 21pins
 brew install 21pins
 ```
+
+`brew search 21pins` only finds the formula after `brew tap automatethething/tap`; before that, Homebrew searches core and already-installed taps only.
 
 `twenty-one-pins` is the internal formula name because Homebrew/Ruby cannot use a class name that starts with a digit. The tap exposes alias `21pins`, so user-facing commands stay lowercase.
 

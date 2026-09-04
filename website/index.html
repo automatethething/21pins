@@ -1282,8 +1282,8 @@
       <h2 class="qs-title">From npm install to routed in under two minutes.</h2>
       <p class="qs-sub">
         Install the CLI, initialise the config, add one provider key, and start routing.
-        Any app that speaks OpenAI-compatible chat will work immediately. Homebrew and source
-        installs are available too if you prefer a slower, auditable path.
+        Any app that speaks OpenAI-compatible chat will work immediately. Prefer Homebrew?
+        Tap first, then <code>brew search 21pins</code> and <code>brew install 21pins</code> work.
       </p>
     </div>
     <div class="code-block">
@@ -1417,6 +1417,13 @@
         <div class="install-label">Start the gateway</div>
         <div class="install-cmd" onclick="copyText(this, '21pins serve --port 8787')">
           <code>21pins serve --port 8787</code>
+          <button class="copy-btn">copy</button>
+        </div>
+      </div>
+      <div class="install-step">
+        <div class="install-label">Homebrew alternative</div>
+        <div class="install-cmd" onclick="copyText(this, 'brew tap automatethething/tap && brew trust automatethething/tap && brew install 21pins')">
+          <code>brew tap automatethething/tap && brew trust automatethething/tap && brew install 21pins</code>
           <button class="copy-btn">copy</button>
         </div>
       </div>

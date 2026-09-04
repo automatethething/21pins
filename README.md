@@ -62,9 +62,12 @@ Homebrew:
 ```bash
 brew tap automatethething/tap
 brew trust automatethething/tap
+brew search 21pins
 brew install 21pins
 21pins init
 ```
+
+`brew search 21pins` only finds the formula after `brew tap automatethething/tap`; before that, Homebrew searches core and already-installed taps only.
 
 Build from source if you prefer to audit before running:
 
