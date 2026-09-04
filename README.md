@@ -64,6 +64,8 @@ go build -o 21pins ./cmd/21pins
 ./21pins key set anthropic --value "$ANTHROPIC_API_KEY"
 ./21pins key set deepseek --value "$DEEPSEEK_API_KEY"
 ./21pins key set venice --value "$VENICE_API_KEY"
+./21pins key set hetzner --value "$HETZNER_API_KEY"
+./21pins key set trymaple --value "$MAPLE_API_KEY" # optional for the desktop proxy
 ./21pins key set gemini --value "$GEMINI_API_KEY"
 # ollama usually does not need an API key
 ```
@@ -74,10 +76,12 @@ Canonical provider names are:
 - `anthropic`
 - `deepseek`
 - `venice`
+- `hetzner`
+- `trymaple`
 - `gemini`
 - `ollama`
 
-Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`, `deepseek.com` -> `deepseek`, `venice.ai` -> `venice`).
+Common aliases are accepted and auto-mapped (for example, `openrouter.ai` -> `openrouter`, `deepseek.com` -> `deepseek`, `venice.ai` -> `venice`, `inference.hetzner.com` -> `hetzner`, `maple` -> `trymaple`).
 
 ### Optional: rotate keys safely
 
@@ -96,7 +100,8 @@ Use `--keep-previous-hours 0` for immediate old-key revocation.
 
 ```bash
 ./21pins models sync
-./21pins models list --provider venice --search llama
+./21pins models list --provider hetzner --search llama
+./21pins models list --provider trymaple --search gpt
 ./21pins models choose --provider openrouter --search gpt
 ```
 
@@ -341,6 +346,22 @@ openssl pkey -in hosted-ed25519-private.pem -pubout -outform DER | base64
 ```
 
 Use the PEM private key as `PINS21_HOSTED_ED25519_PRIVATE_KEY_PEM`. Use the final base64 DER output as `PINS21_HOSTED_PUBLIC_KEY_HOSTED_ED25519_V1` for CLI smoke/tests. Keep the private key only in Vercel secrets.
+
+## Upgrade without losing local state
+
+Upgrading or rebuilding the `21pins` binary does not delete tokens, provider keys, grants, receipts, or usage rows. Those live in the state file, not in the binary.
+
+Default state path:
+
+```bash
+~/.config/21pins/state.json
+```
+
+If you set `PINS21_STATE_PATH`, back up that file instead. Safe pre-upgrade backup:
+
+```bash
+cp ~/.config/21pins/state.json ~/.config/21pins/state.backup.$(date +%Y%m%d%H%M%S).json
+```
 
 ## Env vars
 

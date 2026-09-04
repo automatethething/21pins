@@ -29,6 +29,8 @@ type Config struct {
 	DeepSeekBaseURL   string
 	GeminiBaseURL     string
 	VeniceBaseURL     string
+	HetznerBaseURL    string
+	TryMapleBaseURL   string
 }
 
 type Server struct {
@@ -58,6 +60,12 @@ func NewServer(st *store.Store, cfg Config) *Server {
 	}
 	if cfg.VeniceBaseURL == "" {
 		cfg.VeniceBaseURL = "https://api.venice.ai"
+	}
+	if cfg.HetznerBaseURL == "" {
+		cfg.HetznerBaseURL = "https://inference.hetzner.com"
+	}
+	if cfg.TryMapleBaseURL == "" {
+		cfg.TryMapleBaseURL = "http://127.0.0.1:8080"
 	}
 
 	s := &Server{store: st, cfg: cfg}
@@ -189,6 +197,10 @@ func (s *Server) handleOpenAICompatChat(w http.ResponseWriter, r *http.Request) 
 		target = strings.TrimRight(s.cfg.OllamaBaseURL, "/") + "/v1/chat/completions"
 	case "venice":
 		target = strings.TrimRight(s.cfg.VeniceBaseURL, "/") + "/api/v1/chat/completions"
+	case "hetzner":
+		target = strings.TrimRight(s.cfg.HetznerBaseURL, "/") + "/api/v1/chat/completions"
+	case "trymaple":
+		target = strings.TrimRight(s.cfg.TryMapleBaseURL, "/") + "/v1/chat/completions"
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "provider not supported on openai-compatible endpoint"})
 		return
@@ -235,7 +247,7 @@ func (s *Server) handleProviderPassthrough(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "expected /v1/providers/{provider}/{path}"})
 		return
 	}
-	provider := strings.ToLower(strings.TrimSpace(parts[0]))
+	provider, _ := store.CanonicalProvider(parts[0])
 	restPath := "/" + strings.TrimLeft(parts[1], "/")
 	query := r.URL.RawQuery
 	if provider == "gemini" {
@@ -467,6 +479,10 @@ func (s *Server) providerBase(provider string) (string, error) {
 		return s.cfg.GeminiBaseURL, nil
 	case "venice":
 		return s.cfg.VeniceBaseURL, nil
+	case "hetzner":
+		return s.cfg.HetznerBaseURL, nil
+	case "trymaple":
+		return s.cfg.TryMapleBaseURL, nil
 	default:
 		return "", fmt.Errorf("unsupported provider: %s", provider)
 	}
@@ -493,7 +509,7 @@ type bufferedResponse struct {
 
 func (s *Server) providerRequest(provider, target, method string, incoming http.Header, body []byte) (*http.Request, error) {
 	apiKey := s.store.GetProviderKey(provider)
-	if apiKey == "" && provider != "ollama" {
+	if apiKey == "" && provider != "ollama" && provider != "trymaple" {
 		return nil, fmt.Errorf("no API key configured for provider %s", provider)
 	}
 	req, err := http.NewRequest(method, target, bytes.NewReader(body))
@@ -502,8 +518,12 @@ func (s *Server) providerRequest(provider, target, method string, incoming http.
 	}
 	req.Header.Set("Content-Type", incoming.Get("Content-Type"))
 	switch provider {
-	case "openai", "openrouter", "deepseek", "venice":
+	case "openai", "openrouter", "deepseek", "venice", "hetzner":
 		req.Header.Set("Authorization", "Bearer "+apiKey)
+	case "trymaple":
+		if apiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+		}
 	case "anthropic":
 		req.Header.Set("x-api-key", apiKey)
 		req.Header.Set("anthropic-version", "2023-06-01")

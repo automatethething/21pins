@@ -242,6 +242,13 @@ func syncProviderModels(st *store.Store, provider string) ([]discoveredModel, er
 			return nil, errors.New("no key configured")
 		}
 		return fetchVeniceModels(key)
+	case "hetzner":
+		if key == "" {
+			return nil, errors.New("no key configured")
+		}
+		return fetchHetznerModels(key)
+	case "trymaple":
+		return fetchTryMapleModels(key)
 	case "anthropic":
 		if key == "" {
 			return nil, errors.New("no key configured")
@@ -332,6 +339,14 @@ func fetchVeniceModels(key string) ([]discoveredModel, error) {
 	return fetchOpenAICompatibleModels("https://api.venice.ai/api/v1/models", key)
 }
 
+func fetchHetznerModels(key string) ([]discoveredModel, error) {
+	return fetchOpenAICompatibleModels("https://inference.hetzner.com/api/v1/models", key)
+}
+
+func fetchTryMapleModels(key string) ([]discoveredModel, error) {
+	return fetchOpenAICompatibleModels("http://127.0.0.1:8080/v1/models", key)
+}
+
 func fetchOpenAICompatibleModels(endpoint, key string) ([]discoveredModel, error) {
 	type item struct {
 		ID string `json:"id"`
@@ -339,7 +354,11 @@ func fetchOpenAICompatibleModels(endpoint, key string) ([]discoveredModel, error
 	var resp struct {
 		Data []item `json:"data"`
 	}
-	if err := getJSON(endpoint, map[string]string{"Authorization": "Bearer " + key}, &resp); err != nil {
+	headers := map[string]string{}
+	if strings.TrimSpace(key) != "" {
+		headers["Authorization"] = "Bearer " + key
+	}
+	if err := getJSON(endpoint, headers, &resp); err != nil {
 		return nil, err
 	}
 	out := make([]discoveredModel, 0, len(resp.Data))

@@ -797,18 +797,23 @@ func tokenHash(raw string) string {
 	return hex.EncodeToString(h[:])
 }
 
-var supportedProviders = []string{"anthropic", "deepseek", "gemini", "ollama", "openai", "openrouter", "venice"}
+var supportedProviders = []string{"anthropic", "deepseek", "gemini", "hetzner", "ollama", "openai", "openrouter", "trymaple", "venice"}
 
 var providerAliases = map[string]string{
-	"deepseek.com":       "deepseek",
-	"deepseek-ai":        "deepseek",
-	"openrouter.ai":      "openrouter",
-	"api.venice.ai":      "venice",
-	"venice.ai":          "venice",
-	"google":             "gemini",
-	"google-ai-studio":   "gemini",
-	"googleaistudio":     "gemini",
-	"generativelanguage": "gemini",
+	"deepseek.com":            "deepseek",
+	"deepseek-ai":             "deepseek",
+	"experiments.hetzner.com": "hetzner",
+	"hetzner.com":             "hetzner",
+	"inference.hetzner.com":   "hetzner",
+	"maple":                   "trymaple",
+	"openrouter.ai":           "openrouter",
+	"trymaple.ai":             "trymaple",
+	"api.venice.ai":           "venice",
+	"venice.ai":               "venice",
+	"google":                  "gemini",
+	"google-ai-studio":        "gemini",
+	"googleaistudio":          "gemini",
+	"generativelanguage":      "gemini",
 }
 
 func SupportedProviders() []string {

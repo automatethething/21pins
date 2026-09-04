@@ -110,6 +110,17 @@ func TestSyncProviderModelsRecognizesVenice(t *testing.T) {
 	}
 }
 
+func TestSyncProviderModelsRecognizesHetzner(t *testing.T) {
+	st, err := store.New(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = syncProviderModels(st, "hetzner")
+	if err == nil || err.Error() != "no key configured" {
+		t.Fatalf("expected hetzner to be recognized but missing key, got %v", err)
+	}
+}
+
 func TestParseOpenRouterPricing(t *testing.T) {
 	price := parseOpenRouterPriceToMicrosPerMillion("0.00000015")
 	if price != 150_000 {

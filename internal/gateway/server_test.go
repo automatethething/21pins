@@ -741,6 +741,140 @@ func TestGatewayAcceptsApprovalWithValidApproverAttestation(t *testing.T) {
 	}
 }
 
+func TestGatewayRoutesProviderAliases(t *testing.T) {
+	cases := []struct {
+		name        string
+		model       string
+		keyProvider string
+		base        Config
+		wantPath    string
+	}{
+		{"hetzner alias", "inference.hetzner.com/meta-llama/llama-3.3-70b-instruct", "hetzner", Config{}, "/api/v1/chat/completions"},
+		{"maple alias", "maple/gpt-oss-120b", "trymaple", Config{}, "/v1/chat/completions"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path != tc.wantPath {
+					t.Fatalf("unexpected path: %s", r.URL.Path)
+				}
+				_, _ = w.Write([]byte(`{"id":"ok"}`))
+			}))
+			defer upstream.Close()
+
+			s, _ := store.New(filepath.Join(t.TempDir(), "state.json"))
+			_ = s.SetProviderKey(tc.keyProvider, "provider-key")
+			appToken, _ := s.CreateToken("web", []string{"proxy:chat"})
+			cfg := tc.base
+			cfg.HetznerBaseURL = upstream.URL
+			cfg.TryMapleBaseURL = upstream.URL
+			g := NewServer(s, cfg)
+
+			req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{"model":"`+tc.model+`","messages":[{"role":"user","content":"hi"}]}`))
+			req.Header.Set("Authorization", "Bearer "+appToken)
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			g.Handler().ServeHTTP(w, req)
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestGatewayProviderPassthroughRoutesProviderAliases(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/models" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer hetzner-key" {
+			t.Fatalf("unexpected auth header: %s", got)
+		}
+		_, _ = w.Write([]byte(`{"data":[]}`))
+	}))
+	defer upstream.Close()
+
+	s, _ := store.New(filepath.Join(t.TempDir(), "state.json"))
+	_ = s.SetProviderKey("hetzner", "hetzner-key")
+	appToken, _ := s.CreateToken("web", []string{"proxy:providers"})
+	g := NewServer(s, Config{HetznerBaseURL: upstream.URL})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/providers/inference.hetzner.com/api/v1/models", nil)
+	req.Header.Set("Authorization", "Bearer "+appToken)
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestGatewayForwardsHetznerOpenAICompatibleRequest(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer hetzner-key" {
+			t.Fatalf("unexpected auth header: %s", got)
+		}
+		b, _ := io.ReadAll(r.Body)
+		var payload map[string]any
+		_ = json.Unmarshal(b, &payload)
+		if payload["model"] != "meta-llama/llama-3.3-70b-instruct" {
+			t.Fatalf("expected stripped model, got %v", payload["model"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"ok"}`))
+	}))
+	defer upstream.Close()
+
+	s, _ := store.New(filepath.Join(t.TempDir(), "state.json"))
+	_ = s.SetProviderKey("hetzner", "hetzner-key")
+	appToken, _ := s.CreateToken("web", []string{"proxy:chat"})
+	g := NewServer(s, Config{HetznerBaseURL: upstream.URL})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{"model":"hetzner/meta-llama/llama-3.3-70b-instruct","messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Authorization", "Bearer "+appToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+func TestGatewayForwardsTryMapleOpenAICompatibleRequestWithoutStoredKey(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Fatalf("trymaple without stored key should not forward app token, got %s", got)
+		}
+		b, _ := io.ReadAll(r.Body)
+		var payload map[string]any
+		_ = json.Unmarshal(b, &payload)
+		if payload["model"] != "gpt-oss-120b" {
+			t.Fatalf("expected stripped model, got %v", payload["model"])
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer upstream.Close()
+
+	s, _ := store.New(filepath.Join(t.TempDir(), "state.json"))
+	appToken, _ := s.CreateToken("web", []string{"proxy:chat"})
+	g := NewServer(s, Config{TryMapleBaseURL: upstream.URL})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{"model":"trymaple/gpt-oss-120b","messages":[{"role":"user","content":"hi"}],"stream":true}`))
+	req.Header.Set("Authorization", "Bearer "+appToken)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
 func TestGatewayForwardsDeepSeekOpenAICompatibleRequest(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {

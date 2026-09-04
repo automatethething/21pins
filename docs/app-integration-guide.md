@@ -10,6 +10,8 @@ This is the shortest path for an app to use 21pins with hosted identity attestat
 # optional
 ./21pins key set deepseek --value "$DEEPSEEK_API_KEY"
 ./21pins key set venice --value "$VENICE_API_KEY"
+./21pins key set hetzner --value "$HETZNER_API_KEY"
+./21pins key set trymaple --value "$MAPLE_API_KEY"
 ```
 
 ## 2. Create a hosted identity grant
@@ -21,7 +23,7 @@ export PINS21_HOSTED_PUBLIC_KEY_HOSTED_ED25519_V1='<hosted public key>'
   --ck-hosted \
   --capabilities llm.chat \
   --data-classes public \
-  --targets openrouter,deepseek,venice \
+  --targets openrouter,deepseek,venice,hetzner,trymaple \
   --approval-threshold-cents 100
 ```
 
