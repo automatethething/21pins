@@ -1283,7 +1283,7 @@
       <p class="qs-sub">
         Install the CLI, initialise the config, add one provider key, and start routing.
         Any app that speaks OpenAI-compatible chat will work immediately. Prefer Homebrew?
-        Tap and trust first. Without <code>brew trust automatethething/tap</code>, Homebrew may say
+        Tap and trust first. Without <code>brew trust --tap automatethething/tap</code>, Homebrew may say
         <code>No formulae found</code> even after the tap clones.
       </p>
     </div>
@@ -1423,8 +1423,8 @@
       </div>
       <div class="install-step">
         <div class="install-label">Homebrew alternative</div>
-        <div class="install-cmd" onclick="copyText(this, 'brew tap automatethething/tap && brew trust automatethething/tap && brew install 21pins')">
-          <code>brew tap automatethething/tap && brew trust automatethething/tap && brew install 21pins</code>
+        <div class="install-cmd" onclick="copyText(this, 'brew tap automatethething/tap && brew trust --tap automatethething/tap && brew install 21pins')">
+          <code>brew tap automatethething/tap && brew trust --tap automatethething/tap && brew install 21pins</code>
           <button class="copy-btn">copy</button>
         </div>
       </div>

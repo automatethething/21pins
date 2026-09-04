@@ -52,12 +52,12 @@ Install path:
 
 ```bash
 brew tap automatethething/tap
-brew trust automatethething/tap
+brew trust --tap automatethething/tap
 brew search 21pins
 brew install 21pins
 ```
 
-`brew search 21pins` only works after both `brew tap automatethething/tap` and `brew trust automatethething/tap`. Without trust, newer Homebrew may say `No formulae or casks found` even though the tap cloned successfully.
+`brew search 21pins` only works after both `brew tap automatethething/tap` and `brew trust --tap automatethething/tap`. Without trust, newer Homebrew may say `No formulae or casks found` even though the tap cloned successfully.
 
 `twenty-one-pins` is the internal formula name because Homebrew/Ruby cannot use a class name that starts with a digit. The tap exposes alias `21pins`, so user-facing commands stay lowercase.
 

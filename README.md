@@ -61,13 +61,13 @@ Homebrew:
 
 ```bash
 brew tap automatethething/tap
-brew trust automatethething/tap
+brew trust --tap automatethething/tap
 brew search 21pins
 brew install 21pins
 21pins init
 ```
 
-`brew search 21pins` only works after both `brew tap automatethething/tap` and `brew trust automatethething/tap`. Without trust, newer Homebrew may say `No formulae or casks found` even though the tap cloned successfully.
+`brew search 21pins` only works after both `brew tap automatethething/tap` and `brew trust --tap automatethething/tap`. Without trust, newer Homebrew may say `No formulae or casks found` even though the tap cloned successfully.
 
 Build from source if you prefer to audit before running:
 
