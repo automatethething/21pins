@@ -65,7 +65,7 @@ The upgrade replaces the binary only. It does not touch the 21pins state file.
 
 ## npm
 
-The npm package lives in `npm/`. It does not run a remote-download postinstall. The root package exposes the `21pins` bin wrapper and depends on optional platform packages such as `@privacyguy/21pins-darwin-arm64`, each of which carries one prebuilt binary.
+The npm package lives in `npm/`. It does not run a remote-download postinstall. The root package exposes the unscoped `21pins` bin wrapper and depends on optional platform packages such as `@privacyguy/21pins-darwin-arm64`, each of which carries one prebuilt binary.
 
 Local checks:
 
@@ -95,10 +95,10 @@ npm run pack:platforms
 (cd platforms/darwin-x64 && npm publish --access public)
 (cd platforms/linux-arm64 && npm publish --access public)
 (cd platforms/linux-x64 && npm publish --access public)
-npm publish --access public
+npm publish
 ```
 
-Future install path after approved npm publishes:
+Install path:
 
 ```bash
 npm install -g 21pins

@@ -50,21 +50,23 @@ sudo apt install -y git golang-go ca-certificates
 
 ## Install
 
-Today, build locally:
+Fastest path:
 
 ```bash
+npm install -g 21pins
+21pins init
+```
+
+Build from source if you prefer to audit before running:
+
+```bash
+git clone https://github.com/automatethething/21pins.git
+cd 21pins
 go build -o 21pins ./cmd/21pins
 ./21pins init
 ```
 
-Release packaging is scaffolded but not published yet. Future install paths:
-
-```bash
-brew tap automatethething/tap && brew install 21pins
-npm install -g 21pins
-```
-
-See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.
+Homebrew packaging is scaffolded but not published yet. See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.
 
 ## Quickstart
 
