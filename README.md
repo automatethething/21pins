@@ -61,7 +61,7 @@ Release packaging is scaffolded but not published yet. Future install paths:
 
 ```bash
 brew tap automatethething/tap && brew install 21pins
-npm install -g @privacyguy/21pins
+npm install -g 21pins
 ```
 
 See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.

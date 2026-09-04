@@ -1,5 +1,5 @@
 {
-  "name": "@privacyguy/21pins",
+  "name": "21pins",
   "version": "0.1.1",
   "description": "Local-first LLM key manager and localhost gateway for safer AI apps and agents.",
   "license": "MIT",
@@ -43,8 +43,5 @@
     "x64",
     "arm64"
   ],
-  "private": false,
-  "publishConfig": {
-    "access": "public"
-  }
+  "private": false
 }

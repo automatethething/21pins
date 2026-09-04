@@ -18,7 +18,7 @@ It speaks the OpenAI-compatible `/v1/chat/completions` shape, so many tools can 
 ## Install
 
 ```bash
-npm install -g @privacyguy/21pins
+npm install -g 21pins
 ```
 
 Then initialize local state:

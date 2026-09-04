@@ -101,13 +101,13 @@ npm publish --access public
 Future install path after approved npm publishes:
 
 ```bash
-npm install -g @privacyguy/21pins
+npm install -g 21pins
 ```
 
 Upgrade path:
 
 ```bash
-npm update -g @privacyguy/21pins
+npm update -g 21pins
 ```
 
 The upgrade replaces the npm package/binary only. It does not touch the 21pins state file.
