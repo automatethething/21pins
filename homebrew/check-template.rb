@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-path = File.join(__dir__, 'Formula', '21pins.rb.template')
+path = File.join(__dir__, 'Formula', 'twenty-one-pins.rb.template')
 text = File.read(path)
 required = %w[{{VERSION}} {{DARWIN_ARM64_SHA256}} {{DARWIN_AMD64_SHA256}} {{LINUX_ARM64_SHA256}} {{LINUX_AMD64_SHA256}}]
 missing = required.reject { |placeholder| text.include?(placeholder) }

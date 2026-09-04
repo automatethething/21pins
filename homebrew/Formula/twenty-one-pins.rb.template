@@ -1,4 +1,4 @@
-class Twentyonepins < Formula
+class TwentyOnePins < Formula
   desc "Local-first LLM key custody, policy, and routing gateway"
   homepage "https://21pins.com"
   version "{{VERSION}}"

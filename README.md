@@ -57,6 +57,15 @@ npm install -g 21pins
 21pins init
 ```
 
+Homebrew:
+
+```bash
+brew tap automatethething/tap
+brew trust automatethething/tap
+brew install 21pins
+21pins init
+```
+
 Build from source if you prefer to audit before running:
 
 ```bash
@@ -66,7 +75,7 @@ go build -o 21pins ./cmd/21pins
 ./21pins init
 ```
 
-Homebrew packaging is scaffolded but not published yet. See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.
+See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.
 
 ## Quickstart
 

@@ -40,7 +40,7 @@ npm run check:tag -- v0.1.1
 
 ## Homebrew
 
-GoReleaser builds GitHub Release archives. `homebrew/Formula/21pins.rb.template` is the future tap formula template; fill in `{{VERSION}}` and archive SHA-256 placeholders from `checksums.txt`, then copy it to `automatethething/homebrew-tap/Formula/21pins.rb` after owner approval.
+GoReleaser builds GitHub Release archives. `homebrew/Formula/twenty-one-pins.rb.template` is the formula template; fill in `{{VERSION}}` and archive SHA-256 placeholders from `checksums.txt`, then copy it to `automatethething/homebrew-tap/Formula/twenty-one-pins.rb` with alias `Aliases/21pins`.
 
 Template check:
 
@@ -48,12 +48,15 @@ Template check:
 ruby homebrew/check-template.rb
 ```
 
-Once the tap exists and a release is approved, install path should be:
+Install path:
 
 ```bash
 brew tap automatethething/tap
+brew trust automatethething/tap
 brew install 21pins
 ```
+
+`twenty-one-pins` is the internal formula name because Homebrew/Ruby cannot use a class name that starts with a digit. The tap exposes alias `21pins`, so user-facing commands stay lowercase.
 
 Upgrade path:
 
