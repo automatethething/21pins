@@ -67,7 +67,7 @@ brew install 21pins
 21pins init
 ```
 
-`brew search 21pins` only finds the formula after `brew tap automatethething/tap`; before that, Homebrew searches core and already-installed taps only.
+`brew search 21pins` only works after both `brew tap automatethething/tap` and `brew trust automatethething/tap`. Without trust, newer Homebrew may say `No formulae or casks found` even though the tap cloned successfully.
 
 Build from source if you prefer to audit before running:
 
