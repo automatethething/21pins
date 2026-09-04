@@ -1,0 +1,47 @@
+{
+  "name": "@privacyguy/21pins",
+  "version": "0.1.0",
+  "description": "Install the 21pins local-first LLM gateway CLI.",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/automatethething/21pins.git"
+  },
+  "homepage": "https://21pins.com",
+  "bugs": {
+    "url": "https://github.com/automatethething/21pins/issues"
+  },
+  "bin": {
+    "21pins": "bin/21pins.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check:tag": "node scripts/check-version-tag.js",
+    "check:platforms": "node scripts/check-platform-packages.js",
+    "prepare:platforms": "node scripts/prepare-platform-packages.js",
+    "pack:platforms": "node scripts/pack-platform-packages.js"
+  },
+  "optionalDependencies": {
+    "@privacyguy/21pins-darwin-arm64": "0.1.0",
+    "@privacyguy/21pins-darwin-x64": "0.1.0",
+    "@privacyguy/21pins-linux-arm64": "0.1.0",
+    "@privacyguy/21pins-linux-x64": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "private": false
+}

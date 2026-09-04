@@ -1,0 +1,10 @@
+{
+  "name": "@privacyguy/21pins-darwin-arm64",
+  "version": "0.1.0",
+  "description": "macOS arm64 binary for 21pins.",
+  "license": "UNLICENSED",
+  "os": ["darwin"],
+  "cpu": ["arm64"],
+  "files": ["bin/21pins"],
+  "preferUnplugged": true
+}

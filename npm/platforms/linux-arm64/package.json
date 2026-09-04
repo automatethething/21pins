@@ -1,0 +1,10 @@
+{
+  "name": "@privacyguy/21pins-linux-arm64",
+  "version": "0.1.0",
+  "description": "Linux arm64 binary for 21pins.",
+  "license": "UNLICENSED",
+  "os": ["linux"],
+  "cpu": ["arm64"],
+  "files": ["bin/21pins"],
+  "preferUnplugged": true
+}

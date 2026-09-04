@@ -34,6 +34,10 @@ Providers wired:
 - OpenAI
 - OpenRouter
 - Anthropic
+- DeepSeek
+- Venice
+- Hetzner
+- Maple / TryMaple
 - Gemini
 - Ollama
 
@@ -44,13 +48,23 @@ sudo apt update
 sudo apt install -y git golang-go ca-certificates
 ```
 
-## Install (local build)
+## Install
+
+Today, build locally:
 
 ```bash
 go build -o 21pins ./cmd/21pins
 ./21pins init
 ```
 
+Release packaging is scaffolded but not published yet. Future install paths:
+
+```bash
+brew tap automatethething/tap && brew install 21pins
+npm install -g @privacyguy/21pins
+```
+
+See `docs/packaging.md` for release, Homebrew, npm, and upgrade notes.
 
 ## Quickstart
 
@@ -351,13 +365,14 @@ Use the PEM private key as `PINS21_HOSTED_ED25519_PRIVATE_KEY_PEM`. Use the fina
 
 Upgrading or rebuilding the `21pins` binary does not delete tokens, provider keys, grants, receipts, or usage rows. Those live in the state file, not in the binary.
 
-Default state path:
+Default state path comes from Go's `os.UserConfigDir()`:
 
-```bash
-~/.config/21pins/state.json
+```text
+Linux:  ~/.config/21pins/state.json
+macOS:  ~/Library/Application Support/21pins/state.json
 ```
 
-If you set `PINS21_STATE_PATH`, back up that file instead. Safe pre-upgrade backup:
+If you set `PINS21_STATE_PATH`, back up that file instead. Safe Linux pre-upgrade backup:
 
 ```bash
 cp ~/.config/21pins/state.json ~/.config/21pins/state.backup.$(date +%Y%m%d%H%M%S).json

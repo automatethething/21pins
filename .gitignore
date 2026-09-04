@@ -1,0 +1,13 @@
+dist/
+
+# npm package local installs/build outputs
+npm/node_modules/
+npm/package-lock.json
+npm/bin/darwin/
+npm/bin/linux/
+npm/platforms/*/bin/
+npm/*.tgz
+npm/platforms/*/*.tgz
+
+# local ad-hoc binaries
+/21pins
