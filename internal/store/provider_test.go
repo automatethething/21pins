@@ -33,7 +33,14 @@ func TestCanonicalProviderUnknown(t *testing.T) {
 }
 
 func TestCanonicalProviderNewAliases(t *testing.T) {
-	cases := map[string]string{"hetzner.com": "hetzner", "inference.hetzner.com": "hetzner", "trymaple.ai": "trymaple", "maple": "trymaple"}
+	cases := map[string]string{
+		"hetzner.com":           "hetzner",
+		"inference.hetzner.com": "hetzner",
+		"trymaple.ai":           "trymaple",
+		"maple":                 "trymaple",
+		"claude":                "anthropic",
+		"codex":                 "openai",
+	}
 	for input, want := range cases {
 		canonical, aliasUsed := CanonicalProvider(input)
 		if canonical != want || !aliasUsed {

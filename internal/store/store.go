@@ -800,6 +800,10 @@ func tokenHash(raw string) string {
 var supportedProviders = []string{"anthropic", "deepseek", "gemini", "hetzner", "ollama", "openai", "openrouter", "trymaple", "venice"}
 
 var providerAliases = map[string]string{
+	// Product labels map to their owning API provider; these do not grant access
+	// to subscription clients such as Claude Code or Codex CLI.
+	"claude":                  "anthropic",
+	"codex":                   "openai",
 	"deepseek.com":            "deepseek",
 	"deepseek-ai":             "deepseek",
 	"experiments.hetzner.com": "hetzner",

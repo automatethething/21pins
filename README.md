@@ -47,7 +47,7 @@ Use provider names for credentials and routing namespaces; do not invent provide
 
 - `anthropic` is Anthropic, the company that owns the Claude model family. Use `anthropic` for an Anthropic API key and `anthropic/<claude-model>` for direct Anthropic API routing.
 - `openai` is OpenAI, the company that owns Codex. Use `openai` for an OpenAI API key and `openai/<model>` for direct OpenAI API routing.
-- `claude` and `codex` are product/model labels, not 21pins provider IDs. Subscription clients such as Claude Code and Codex CLI remain on their native subscription routes; 21pins does not turn those subscriptions into API credentials.
+- `claude` and `codex` are product/model labels, not 21pins provider IDs. They are accepted as convenience aliases for `anthropic` and `openai` when configuring API-key routes. Subscription clients such as Claude Code and Codex CLI remain on their native subscription routes; 21pins does not turn those subscriptions into API credentials.
 
 This distinction is intentional: future agents should say “Anthropic/Claude” or “OpenAI/Codex” when describing ownership, while preserving the canonical 21pins provider IDs (`anthropic` and `openai`).
 
