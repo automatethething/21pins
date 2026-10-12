@@ -79,6 +79,14 @@ Example role policy (durations are configurable, not architectural constants):
 
 Use `explicit_approval: true` for higher-privilege roles. Preapproval cannot bypass that requirement. Never infer privilege from successful SSH: dedicated OS accounts, sudoers and filesystem/network permissions remain host policy. Native signer extensions are deny-by-default (`-O clear`); user rc is never granted. The shipped CLI stays stricter: it does not provide forwarding flags, even if a manually configured role certificate permits them.
 
+### What `observe` authorizes (not command-level RBAC)
+
+An `observe` principal is a login/OS-account/SSH-feature scope, **not a read-only executable whitelist**. A valid `21pins:local:finland-staging-221:observe` certificate mapped to `pins-agent`, once approved trust and an eligible ordinary account shell exist, permits arbitrary noninteractive commands as that Unix account. The account can read/write/delete whatever its OS permissions allow; no-sudo is not equivalent to read-only access.
+
+The signer uses `-O clear` and adds only explicit role feature extensions. With the proposed default observe flags all false, a native certificate has **critical options: none; extensions: none**. There is no certificate `force-command`, server-side ForceCommand in the reviewed block, restricted wrapper, command allowlist or command-content/purpose inspection. The verifier presently rejects any nonempty critical-options list. Purpose is immutable control-plane approval/audit/renewal metadata, not a target-enforced command restriction. CLI shell quoting prevents argument interpolation bugs; it does not prohibit `sh -c` or other arbitrary executables.
+
+The isolated fixture's ForceCommand is solely test containment and is not deployed by bootstrap. Require an additional reviewed server wrapper/ForceCommand plus OS isolation if command-level or strictly read-only authority is desired; that is a different, unimplemented security policy and must not be implied by the word `observe`.
+
 Host principals: `21pins:<workspace-id>:<host-id>:<role-id>`. Each host/Unix user accepts only its own configured principals. Never reuse a logical host ID for a different physical host. A different host with the same workspace CA rejects the certificate unless its administrator has incorrectly installed that other host's principal.
 
 ## Production CA boundary
