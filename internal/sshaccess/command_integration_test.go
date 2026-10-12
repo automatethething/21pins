@@ -27,6 +27,9 @@ func TestIsolatedDNSAdminAuthority(t *testing.T) {
 	// Native SSH fixture proves literal operation dispatch, not production sudo/kernel WG.
 	for i := range rules {
 		rules[i].Exec = []string{"/usr/bin/printf", "fixture-" + dnsadmin.Operations[i]}
+		if i >= 3 {
+			rules[i].Exec = []string{"/usr/bin/false"}
+		} // Missing proof must propagate nonzero through the actual SSH gate.
 	}
 	runIsolatedRoleGate(t, "dns-admin", rules)
 }
@@ -154,11 +157,18 @@ func runIsolatedRoleGate(t *testing.T, role string, rules []sshcommand.Rule) {
 		return cmd.Output()
 	}
 	for _, r := range rules {
-		if out, e := run(strings.Join(r.Command, " ")); e != nil || strings.TrimSpace(string(out)) == "" {
+		out, e := run(strings.Join(r.Command, " "))
+		if r.Exec[0] == "/usr/bin/false" {
+			if e == nil || len(out) != 0 {
+				t.Fatal("unavailable proof claimed success through SSH gate")
+			}
+			continue
+		}
+		if e != nil || strings.TrimSpace(string(out)) == "" {
 			t.Fatal("allowed operation denied")
 		}
 	}
-	for _, s := range []string{allowed + " extra", allowed + ";id", allowed + " $(id)", "sudo /bin/sh", "dns query altered"} {
+	for _, s := range []string{allowed + " extra", allowed + ";id", allowed + " $(id)", "sudo /bin/sh", "dns query altered", "beryl enroll", "beryl verify", "wireguard state", "wireguard handshake", "adguard status", "adguard filtering"} {
 		if _, e := run(s); e == nil {
 			t.Fatal("dns/root argument bypass")
 		}

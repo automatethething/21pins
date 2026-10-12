@@ -30,7 +30,12 @@ func setup(t *testing.T) *fixture {
 	t.Helper()
 	d := t.TempDir()
 	f := &fixture{peers: map[string][]netip.Prefix{key(2): {netip.MustParsePrefix("10.66.66.6/32")}}, service: true, handshake: time.Now().Unix()}
-	f.x = engine{m: Manifest{Workspace: "local", Host: "dns-primary", Interface: "wg0", Peer: key(1), Config: filepath.Join(d, "wg.conf"), Resolver: resolver, ControlDomain: "probe.example", ControlA: "10.77.0.53", BlockedDomain: "blocked.example", BlockedA: "NXDOMAIN", AdGuardUnit: "AdGuardHome.service", IsolationRulesHash: digest([]byte("rules")), IsolationProof: filepath.Join(d, "proof.json"), GuestPrefix: "10.88.0.0/24", GuestIngress: "guest0"}, dir: d, read: os.ReadFile, now: time.Now}
+	f.x = engine{m: Manifest{Workspace: "local", Host: "dns-primary", Interface: "wg0", Peer: key(1), Config: filepath.Join(d, "wg.conf"), Resolver: resolver, ControlDomain: "probe.example", ControlA: "10.77.0.53", BlockedDomain: "blocked.example", BlockedA: "NXDOMAIN", TechnitiumUnit: "dns.service", ServiceConfigHash: digest([]byte("technitium-unit")), IsolationRulesHash: digest([]byte("rules")), IsolationProof: filepath.Join(d, "proof.json"), GuestPrefix: "10.88.0.0/24", GuestIngress: "guest0"}, dir: d, read: func(p string) ([]byte, error) {
+		if p == "/etc/systemd/system/dns.service" {
+			return []byte("technitium-unit"), nil
+		}
+		return os.ReadFile(p)
+	}, now: time.Now}
 	os.WriteFile(f.x.m.Config, []byte("[Interface]\nPrivateKey = synthetic-never-display\n\n[Peer]\nPublicKey = "+key(2)+"\nAllowedIPs = 10.66.66.6/32\n"), 0600)
 	f.x.run = func(tool string, a ...string) ([]byte, error) {
 		f.calls = append(f.calls, tool+" "+strings.Join(a, " "))
@@ -66,13 +71,16 @@ func setup(t *testing.T) *fixture {
 			}
 			return nil, Denied
 		}
-		if tool == "/usr/bin/dig" && len(a) == 8 && a[0] == "@"+resolver {
+		if tool == "/usr/bin/dig" && (len(a) == 8 || len(a) == 9) && a[0] == "@"+resolver {
 			if a[1] == f.x.m.ControlDomain {
 				return []byte(";; ->>HEADER<<- status: NOERROR,\nprobe.example. 30 IN A 10.77.0.53\n"), nil
 			}
 			return []byte(";; ->>HEADER<<- status: NXDOMAIN,\n"), nil
 		}
-		if tool == "/usr/bin/systemctl" && len(a) == 3 && a[2] == "AdGuardHome.service" {
+		if tool == "/usr/bin/systemctl" && strings.Join(a, " ") == "show --property=DropInPaths --value dns.service" {
+			return nil, nil
+		}
+		if tool == "/usr/bin/systemctl" && len(a) == 3 && a[2] == "dns.service" {
 			if f.service {
 				return nil, nil
 			}
@@ -106,7 +114,7 @@ func TestEnrollmentTransactionAndPrivilegeSurface(t *testing.T) {
 	if _, e = os.Stat(f.x.dir + "/pending.json"); !os.IsNotExist(e) {
 		t.Fatal("journal retained")
 	}
-	for _, op := range []string{"peer-verify", "wg-state", "wg-handshake", "dns-query", "dns-test", "adguard-status", "adguard-filtering"} {
+	for _, op := range []string{"peer-verify", "wg-state", "wg-handshake", "dns-query", "dns-test", "technitium-status", "technitium-filtering"} {
 		if r, e = f.x.operation(op); e != nil || !r.Verified {
 			t.Fatal(op)
 		}
@@ -206,7 +214,7 @@ func TestGuestIsolationNeedsFreshBoundGuestPacketProof(t *testing.T) {
 func TestManifestParsingAndRootBoundary(t *testing.T) {
 	f := setup(t)
 	m := f.x.m
-	m.Config = "/etc/wireguard/wg0.conf"
+	m.Interface, m.Peer, m.Config = "", "", ""
 	m.IsolationProof = "/var/lib/21pins/dns-admin/guest-proof.json"
 	if !valid(m) {
 		t.Fatal("valid pins")
@@ -228,7 +236,7 @@ func TestManifestParsingAndRootBoundary(t *testing.T) {
 		t.Fatal("native multi-prefix output")
 	}
 	f.service = false
-	if _, e := f.x.operation("adguard-filtering"); e == nil {
-		t.Fatal("absent AdGuard falsely verified")
+	if _, e := f.x.operation("technitium-filtering"); e == nil {
+		t.Fatal("absent Technitium falsely verified")
 	}
 }

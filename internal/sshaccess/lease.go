@@ -398,7 +398,15 @@ func (s *Service) Open(a Actor, q OpenRequest) (Lease, error) {
 		if r.Requesters[a.Name] == "preapproved" && !r.ExplicitApproval {
 			state = Active
 		}
-		result = Lease{ID: randomID(), Workspace: s.Config.Workspace, RequesterID: a.ID, Requester: a.Name, AgentClass: q.AgentClass, HostID: q.HostID, RoleID: q.RoleID, SSHUser: r.SSHUser, SSHAlias: s.Config.Hosts[q.HostID].Alias, SSHJumpAlias: s.Config.Hosts[q.HostID].JumpAlias, RenewBefore: s.Config.RenewBefore, ObjectiveID: q.ObjectiveID, Purpose: q.Purpose, PublicKeyFingerprint: fp, Principal: "21pins:" + s.Config.Workspace + ":" + q.HostID + ":" + q.RoleID, EstimatedDuration: q.EstimatedDuration, PolicyDigest: scopeDigest(s.Config, q.HostID, q.RoleID), OpenedAt: now, HardExpiresAt: now.Add(window), Status: state, EffectivePolicy: r}
+		renewWindow, _ := duration(s.Config.RenewBefore)
+		certificateTTL, _ := duration(s.Config.CertTTL)
+		if capTTL, e := duration(r.MaxCertTTL); e == nil && capTTL < certificateTTL {
+			certificateTTL = capTTL
+		}
+		if renewWindow >= certificateTTL {
+			renewWindow = certificateTTL / 3
+		}
+		result = Lease{ID: randomID(), Workspace: s.Config.Workspace, RequesterID: a.ID, Requester: a.Name, AgentClass: q.AgentClass, HostID: q.HostID, RoleID: q.RoleID, SSHUser: r.SSHUser, SSHAlias: s.Config.Hosts[q.HostID].Alias, SSHJumpAlias: s.Config.Hosts[q.HostID].JumpAlias, RenewBefore: renewWindow.String(), ObjectiveID: q.ObjectiveID, Purpose: q.Purpose, PublicKeyFingerprint: fp, Principal: "21pins:" + s.Config.Workspace + ":" + q.HostID + ":" + q.RoleID, EstimatedDuration: q.EstimatedDuration, PolicyDigest: scopeDigest(s.Config, q.HostID, q.RoleID), OpenedAt: now, HardExpiresAt: now.Add(window), Status: state, EffectivePolicy: r}
 		d.Leases[result.ID] = result
 		return nil
 	})

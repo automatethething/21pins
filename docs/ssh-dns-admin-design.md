@@ -1,80 +1,52 @@
-# dns-admin: pinned one-peer helper and VM 220 review
+# Technitium-only VM220 dns-admin authority
 
-**Implemented and isolated-tested; NOT installed or registered on VM 220.** VM 220 trust, accounts, configuration, packages, services, peer state and network remain unchanged. No dns-admin certificates are issued by the real issuer.
+Owner decision: **Use existing Technitium**. This supersedes the combined VM220 WG/AdGuard role assumptions. Pi reads local references itself and presents approvals directly in the conversation, not through manual file/dashboard retrieval.
 
-## Critical read-only preflight finding
+## Actual authorities
 
-VM 220 / dns-primary has an active **Technitium (.NET) DNS service**, listening on UDP53, with the requested private address `10.77.0.53`. It has **no WireGuard link kind, wg tool or persistent WireGuard config**, and **no configured/running AdGuard service** in the inspected native service/process configuration. The existing management host also has no wg tool. This is not evidence about kernel module availability or an exhaustive disk inventory.
+- VM220 `dns-primary`: existing Technitium `dns.service`, private resolver `10.77.0.53`; no WG/AdGuard installation there.
+- VM205 `wg-gateway`: existing WG authority, private LAN `10.77.0.13`, tunnel `10.66.66.1/24`; supplied Beryl address-associated peer `10.66.66.5/32` already live/persistent with recent handshake. No independent public-identity enrollment attestation is inferred.
+- Existing management bastion supplies explicit immutable SSH transport only. Its TCP -W path is not WG UDP transport.
+- Gateway→resolver ordinary UDP/TCP DNS queries currently time out; VM220's local private-resolver UDP/TCP localhost probes pass. These are different vantage points, not proof of Beryl DNS or guest isolation.
 
-Therefore the requested WireGuard/AdGuard authority is not presently backed by resources on this target. Trust approval cannot create valid interface/peer/AdGuard/guest pins. Do not install packages, replace Technitium, create an interface, invent a Beryl identity, silently substitute Technitium for AdGuard, spread root authority to another host, or activate a synthetic fixture manifest. Resolve the intended service placement with the owner before preparing an installable real manifest. This is a genuine prerequisite ahead of the requested trust-only approval, not an outstanding implementation/test task.
+The previous name-filtered search omitted the `wg` abbreviation and cannot support an absent/unknown WG authority conclusion. Corrected minimized evidence: `flowstate/ops/reports/finland-private-dns-topology.md` (read by Pi; owned by the separate read-only ops investigator).
 
-## Immutable least-privilege role
+## Exact production role
 
-Separate Unix account `pins-dns-agent`, only its primary group, no ordinary keys/passwords, root-owned empty HOME and trusted noninjectable login shell. Host `dns-primary`, role `dns-admin`, workspace `local`, dedicated principal, exact signed/principals/server force-command and command rules digest. Do not share observe's Unix user. Requester `pi`, explicit owner approval, review-only `sshaccess.DNSAdminHost` factory fixes default lease 15m/hard ceiling 30m/certificates ≤5m, no preapproval/PTY/forwarding/tunnels/subsystems. Existing approved `fipi` bastion is explicit host/lease policy, never an inherited arbitrary proxy; all CA/requester private keys/socket/API tokens stay on Mac.
+Separate proposed `pins-dns-agent` account. Host `dns-primary`; role `dns-admin`; workspace `local`; proposed alias `pins-vm220`, existing jump `fipi`. Explicit pi approval, no self-approval, 15m default/30m maximum lease, ≤5m certificates. Renewal window is bounded below the effective role certificate TTL (default 1m40s when a global 5m window would otherwise equal the role TTL). No PTY, agent/TCP/stream-local forwarding, X11, tunnels, arbitrary commands/args or raw-key login.
 
-| Literal operation | Fixed helper operation |
-| --- | --- |
-| `beryl enroll` | `peer-enroll` |
-| `beryl verify` | `peer-verify` |
-| `wireguard state` | `wg-state` |
-| `wireguard handshake` | `wg-handshake` |
-| `dns query` | `dns-query` |
-| `dns test` | `dns-test` |
-| `adguard status` | `adguard-status` |
-| `adguard filtering` | `adguard-filtering` |
-| `guest isolation` | `guest-isolation` |
+| Literal command | Fixed root-helper operation | Evidence |
+|---|---|---|
+| `dns query` | `dns-query` | Exact control A response at fixed resolver over UDP |
+| `dns test` | `dns-test` | Same pinned control response over **UDP and TCP** |
+| `technitium status` | `technitium-status` | Exact root unit-file digest, no systemd drop-ins, exact named unit active |
+| `technitium filtering` | `technitium-filtering` | Requires separately reviewed known blocked-domain pin plus control success and explicit sinkhole/NXDOMAIN; missing pin/native failure denies |
+| `guest isolation` | `guest-isolation` | Requires separately reviewed firewall digest/guest selectors and fresh independently root-generated external guest-origin TCP+UDP denial proof; missing prerequisites deny before native calls |
 
-Each maps to **exact** `/usr/bin/sudo -n /usr/local/bin/21pins dns-admin OP SHA256_MANIFEST`. No caller argument is interpolated or forwarded to tools. Root helper rejects nonroot, extra args, unknown operations, changed manifest bytes/digest, symlink/untrusted ownership/permissions/ancestors. Digest is included in every fixed Exec argv, so signed command rules and exact sudoers bind the manifest as well as the operation. Changing peer/interface/test domains/firewall evidence pins requires a new reviewed manifest, rules version, sudoers and approval; old certificates fail closed.
+Every rule invokes only `/usr/bin/sudo -n /usr/local/bin/21pins dns-admin OP SHA256_MANIFEST`. Exact sudoers and identical certificate/principals/account force-command bind the digest-aware gate. Generic sudo/shell/packages/network writes are not granted.
 
-`sshaccess.DNSAdminHost` builds this exact non-fixture, explicit-approval policy without registration/install; unit tests reject >30m requests, unapproved signing, self-approval and altered jump scope. `internal/dnsadmin.Rules` and `Sudoers` produce the nine mappings and exact argument strings. Sudoers permits only these entries as root, NOPASSWD/NOSETENV, env_reset, !setenv, secure native path; no wildcards, generic sudo/wg/ip/dig/systemctl, shell, package manager, arbitrary paths, input config or environment preservation. Gate/user/host/role isolation remains the existing native OpenSSH enforcement, not purpose text.
+**WireGuard/Beryl operations are absent from production dispatch, signed rules and sudoers.** The production manifest rejects even dormant WG interface/peer/config fields. Private staged enrollment/rollback routines remain tested but are unreachable through this role; any VM205 capability requires a separate reviewed host/role/account/approval.
 
-## Root helper and manifest
+## Real reviewed manifest, not invented prerequisites
 
-Implemented in `internal/dnsadmin`, early `21pins dns-admin` dispatch before application/issuer store initialization. No unrelated provider state is created. Production has no fixture, tool-path or manifest-path overrides.
+`ssh-technitium-manifest.json` pins the fresh actual unit configuration and confirmed `localhost → 127.0.0.1` control response. SHA256 `1ddc2d4175ad8435d36acb39138052a9506bb858558cbf94e71260e36686909a`.
 
-Fixed root-only manifest `/etc/21pins/dns-admin.json`, mode 0600, contains workspace `local`, host `dns-primary`, exact interface and `/etc/wireguard/INTERFACE.conf`, one existing Beryl **public** peer identity, fixed resolver `10.77.0.53`, distinct fixed control/blocked query domains and expected answers, exact `AdGuardHome.service`, reviewed stateless nft rules hash, guest prefix/ingress and `/var/lib/21pins/dns-admin/guest-proof.json` evidence path. Enrollment CIDR is hardcoded `10.66.66.5/32`; caller cannot choose other peers/ranges/endpoints/keepalive/keys.
+Unit SHA256 `5f5c27393fb97cbcc579927f49570d4a6f6610462d5d20d558c4dfa00b9c67a4`; fixed `/etc/systemd/system/dns.service`; exact `dns.service`; drop-ins denied. Root service/native tools and root configuration remain the TCB: this is configuration-drift/status verification, not full executable/library/socket identity attestation.
 
-Native wg/dig/systemctl/nft executable ownership/ancestors are validated root-nonwritable/nonsymlink. Each fixed absolute invocation has cwd `/`, explicit minimal environment, four-second timeout and capped one-MiB output. Tool/config output, peer keys/endpoints, private WireGuard data and raw stderr never enter reports. Output is fixed operation/status/booleans/counts only. Missing tools/services/expected outcomes deny, never become synthetic success.
+Filter and guest selectors are deliberately absent: their commands return nonzero/unverified, not synthetic success. They cannot be filled with fake probe domains or local self-attestation. Changing the reviewed manifest requires new rules digest/approval; old argv/cert policy cannot silently operate new content.
 
-Root-only `/var/lib/21pins/dns-admin` mode 0700 contains installed root0600 `lock`, transient rollback journal and independent guest proof. Exclusive nonblocking flock bounds concurrency; read operations neither create lock nor mutate state. Only enrollment creates/removes its own private transaction material and writes the one pinned persistence file. Non-writable root ancestors and nonsymlink regular files are required. Helpers cannot run directly as the SSH user.
+Force-command rules digest: `c14d60af957ce2a432d6dab344d2f346081c03b1eacd958881d191f53f78d81c`.
 
-## Bounded enrollment transaction and recovery
+## Root/helper protections
 
-- Parse complete native persistent/live peer ranges locally. One interface section, no duplicate peer/range definitions, no SaveConfig=true races; missing/invalid native state fails closed. Reject overlap, other peer takeover, altered Beryl ranges and live/persistent disagreement.
-- Correct live+persistent existing pinned /32 is idempotent. Otherwise append **only** the absent reviewed peer section; preserve all original bytes/private material/unrelated peers. No interface restart, global sync, key changes, endpoint/route/firewall/resolver changes.
-- Under lock fsync root0600 journal with original persistent bytes and original live peer map plus manifest/patched hashes. Persist private temp with fsync/atomic rename/directory fsync, then native wg set one peer allowed-ips.
-- Verify exact file hash, pinned peer/range and all unrelated live peers. On error restore only if current persistence is the expected original/patched version, restore/remove the pinned peer only, verify original disk plus entire prior live peer map. Never claim successful rollback if unrelated drift/restore failure exists.
-- Crash leaves a root-private journal. Read-only verify denies pending recovery; next authorized enroll validates binding, restores/verifies the prior snapshot, then retries. Manifest changes or concurrent root drift fail closed, retaining recovery journal for the owner. Successful/verified rollback removes the journal. Own orphan private temp files are cleaned only by enrollment under the same lock, never by ordinary read operations.
-- A missing/future/stale handshake is not enrollment success evidence: `wireguard handshake` independently requires exact peer plus fresh timestamp ≤3m. Configured peer and handshake are distinct facts.
+Exact root execution and argv/digest validation before parsing; strict JSON unknown/trailing fields rejected. Root-owned regular nonsymlink files/ancestors, private manifest/state/installed nonblocking lock. Fixed native tools, clean minimal environment, ≤4s native timeouts/bounded output. No read-only operation creates configuration, packages, proof or provider state. Service unit may be root-readable 0644 but not writable/non-root/symlink; manifest/lock/proof remain root-private.
 
-## DNS, filtering and guest evidence
+Any denied/missing proof yields nonzero CLI/SSH exit and `verified:false`. Native root/helper and native SSH gate failure propagation are separately exercised; fixture tests are never labeled real packet/production cert-sudo proof.
 
-`dns query` tests only the fixed control domain/A answer on the fixed resolver. `dns test` additionally verifies the pinned blocked domain's exact NXDOMAIN or unspecified IPv4 outcome. No arbitrary domains/types/resolver/flags/traffic generator. AdGuard status requires its exact active native unit; filtering requires both service and control/blocked DNS outcomes. This deliberately refuses to label the current Technitium service as AdGuard.
+## Validation and activation gate
 
-`guest isolation` requires unchanged reviewed stateless firewall hash **and** fresh (≤2m), root-owned independently produced guest-origin evidence bound to the same firewall hash and exact guest prefix/ingress, with both TCP and UDP denied. Missing/stale/wrong-source/DNS-only evidence returns failure, even if policy matches. The helper does not manufacture guest traffic, change interfaces/namespaces/firewalls, use router credentials, or turn a localhost/DNS check into packet-isolation proof. Root evidence producer/actual guest source must be selected and tested once the real topology is known. Root is TCB; attestations are not permission to invent a packet test.
+Go/race/vet, manifest/ownership/digest/privilege tests; root Linux chroot production helper with explicit DNS/service/firewall/guest fixtures and native sudoers syntax; real isolated SSH literal/scope/escape/PTY/forward/old-WG/old-AdGuard negatives and proof-child nonzero propagation; real current-binary Mac→bastion→VM221 regression; seven Node/Pi lifecycle tests.
 
-## Verification completed
+Read-only actual VM220 prospective SSH candidate validates from `/dev/stdin`, preserves **29** recovery contexts, disables forwarding/TTY/user environments and installs nothing. Real unit pin/no-dropins and local UDP+TCP loopback DNS checks pass; management private target SSH is reachable.
 
-- Go/race/vet and strict rules/manifest/dispatch/ownership/parser/conflict/idempotence/transaction/failure/rollback/crash-recovery/redacted-output tests.
-- Native isolated OpenSSH dns-admin role dispatch for all nine operations, signed critical/principals/server gate, altered args/chaining/shell/substitution/generic sudo/wrapper/wrong host/role/user/SFTP/PTY/forward/raw-key/policy-drift negatives, renewal/complete. Dispatch fixture uses fixed printf only; production privilege boundaries tested separately.
-- Real root Linux chroot runs production static helper with root manifest/config/lock and explicitly stateful fixture WG/DNS/service tools. All nine operations plus nonroot/argv/manifest/hash/permissions/symlink/lock denials and native visudo syntax pass. No production fixture switches. Entire chroot is deleted; no VM220/221 mutation.
-- VM220 complete prospective SSH candidate validated **in memory through /dev/stdin**, no target file writes: native syntax passes, exact ForceCommand/AcceptEnv replacement/PermitUserEnvironment=no/DisableForwarding yes. 29 current accounts identified; actual recovery comparisons must be repeated after a real manifest/candidate is prepared and before installation.
-- Existing Mac→VM221 bastion/CLI workflow regression remains required; no global CLI/Pi settings changed. Current repository binary is rebuilt/tested at the owner-selected path.
-
-These prove isolated implementation, not real WG kernel enrollment/handshake, AdGuard filtering or guest traffic on VM220. Nothing is activated on that target.
-
-```sh
-go test ./...
-go test -race ./...
-go vet ./...
-PINS21_SSH_INTEGRATION=1 go test ./internal/sshaccess \
-  -run 'TestIsolatedDNSAdminAuthority|TestIsolatedCommandAuthority|TestIsolatedOpenSSH' -count=1 -v -timeout 110s
-python3 scripts/ssh-dns-admin-isolated.py --self-test
-python3 scripts/ssh-dns-admin-isolated.py --run
-```
-
-## Remaining owner boundary
-
-Pi reads/reconciles known local files and existing authorized resources itself; no manual Markdown/dashboard retrieval is an owner blocker. Fresh reconciliation of VM220, known VM221 and the management-local name-filtered service inventory identifies only VM220/Technitium, not a real WG/AdGuard authority. [Prerequisites plan](ssh-dns-admin-prerequisites.md) is prepared without further implementation authorization or mutations. The remaining **backend/scope decision** is genuine: adapt DNS-specific authority to existing Technitium (recommended, preserving working DNS), or retain original WG/AdGuard semantics with separately reviewed production prerequisites. Do not request misleading trust-only approval or silently substitute services/privileged targets. Public peer references remain local; never paste private keys/tokens/passwords or public endpoints into chat.
-
-Once actual reviewed pins/resources are available, the next installation approval must be exact: VM220 only, root-owned static binary/gate/policy/manifest/lock, new unprivileged account, nine exact sudo entries, selected existing public CA/principals and EOF Match; backup/recovery comparison/native validation/safe reload/fresh certificate smoke with rollback. No Beryl enrollment or service/network/package mutation is silently included in trust installation. Explicit separately approved pinned enroll then proves live/disk/handshake and real DNS/guest traffic. Existing CA custody remains on Mac; no new permanent trust on management host.
+No VM220 trust/account/config/service/package/network/peer changes or real dns-admin issuer registration/certificates yet. CA private/signing agent/requester keys/tokens remain on Mac. Future exact one-time trust approval is limited to account/gate/public CA/principals/policy/manifest/lock/exact sudoers and safe SSH validation/reload; no DNS replacement, WG gateway access/enrollment, filtering reconfiguration or firewall repair is included. [Prerequisites and corrected reachability gate](ssh-dns-admin-prerequisites.md).

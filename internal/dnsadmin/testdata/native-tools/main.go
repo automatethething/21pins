@@ -53,11 +53,14 @@ func main() {
 			return
 		}
 	case "systemctl":
-		if strings.Join(a, " ") == "is-active --quiet AdGuardHome.service" {
+		if strings.Join(a, " ") == "show --property=DropInPaths --value dns.service" {
+			return
+		}
+		if strings.Join(a, " ") == "is-active --quiet dns.service" {
 			return
 		}
 	case "dig":
-		if len(a) == 8 && a[0] == "@10.77.0.53" {
+		if (len(a) == 8 || len(a) == 9) && a[0] == "@10.77.0.53" {
 			if a[1] == m.Control {
 				fmt.Println(";; ->>HEADER<<- status: NOERROR,\n" + m.Control + ". 30 IN A 10.77.0.53")
 				return

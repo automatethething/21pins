@@ -9,7 +9,7 @@ import (
 func TestExactManifestBoundRulesAndSudoers(t *testing.T) {
 	h := strings.Repeat("a", 64)
 	rules, e := Rules(h)
-	if e != nil || len(rules) != 9 {
+	if e != nil || len(rules) != 5 {
 		t.Fatal("rules")
 	}
 	a := sshcommand.Authority{Binary: "/usr/local/bin/21pins", PolicyFile: "/etc/ssh/21pins/commands.json", Rules: rules}
@@ -36,7 +36,7 @@ func TestExactManifestBoundRulesAndSudoers(t *testing.T) {
 			t.Fatal("altered arguments")
 		}
 	}
-	for _, s := range []string{"beryl enroll; id", "beryl enroll $(id)", "sudo /bin/sh", "wg set wg0", "dns query changed", "beryl enroll\nsh"} {
+	for _, s := range []string{"beryl enroll", "beryl verify", "wireguard state", "wireguard handshake", "adguard status", "adguard filtering", "beryl enroll; id", "beryl enroll $(id)", "sudo /bin/sh", "wg set wg0", "dns query changed", "beryl enroll\nsh"} {
 		v, e := sshcommand.Parse(s)
 		if e == nil {
 			_, e = sshcommand.Authorize(p.Roles["dns-admin"], v)

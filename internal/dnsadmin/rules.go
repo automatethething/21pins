@@ -12,7 +12,7 @@ func Rules(manifestDigest string) ([]sshcommand.Rule, error) {
 	if e != nil || len(b) != 32 || strings.ToLower(manifestDigest) != manifestDigest {
 		return nil, Denied
 	}
-	words := [][]string{{"beryl", "enroll"}, {"beryl", "verify"}, {"wireguard", "state"}, {"wireguard", "handshake"}, {"dns", "query"}, {"dns", "test"}, {"adguard", "status"}, {"adguard", "filtering"}, {"guest", "isolation"}}
+	words := [][]string{{"dns", "query"}, {"dns", "test"}, {"technitium", "status"}, {"technitium", "filtering"}, {"guest", "isolation"}}
 	rules := make([]sshcommand.Rule, len(Operations))
 	for i, op := range Operations {
 		rules[i] = sshcommand.Rule{Command: words[i], Exec: []string{"/usr/bin/sudo", "-n", "/usr/local/bin/21pins", "dns-admin", op, manifestDigest}}

@@ -30,7 +30,9 @@ const resolver = "10.77.0.53"
 
 var word = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$`)
 var domain = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,251}[a-z0-9]$`)
-var Operations = []string{"peer-enroll", "peer-verify", "wg-state", "wg-handshake", "dns-query", "dns-test", "adguard-status", "adguard-filtering", "guest-isolation"}
+
+// DNS-only production authority: staged WireGuard helpers have no public dispatch/sudo grant.
+var Operations = []string{"dns-query", "dns-test", "technitium-status", "technitium-filtering", "guest-isolation"}
 
 type Manifest struct {
 	Workspace          string `json:"workspace"`
@@ -43,7 +45,8 @@ type Manifest struct {
 	ControlA           string `json:"control_a"`
 	BlockedDomain      string `json:"blocked_domain"`
 	BlockedA           string `json:"blocked_a"`
-	AdGuardUnit        string `json:"adguard_unit"`
+	TechnitiumUnit     string `json:"technitium_unit"`
+	ServiceConfigHash  string `json:"service_config_hash"`
 	IsolationRulesHash string `json:"isolation_rules_hash"`
 	IsolationProof     string `json:"isolation_proof"`
 	GuestPrefix        string `json:"guest_prefix"`
@@ -75,23 +78,26 @@ type journal struct {
 
 func digest(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:]) }
 func valid(m Manifest) bool {
-	k, e := base64.StdEncoding.DecodeString(m.Peer)
-	if e != nil || len(k) != 32 {
+	// No live WG pins/authority exist: reject even dormant WG configuration in this profile.
+	if m.Interface != "" || m.Peer != "" || m.Config != "" {
 		return false
 	}
 	a, e := netip.ParseAddr(m.ControlA)
-	if e != nil || !a.Is4() {
+	h, e2 := hex.DecodeString(m.ServiceConfigHash)
+	if e != nil || !a.Is4() || e2 != nil || len(h) != 32 || m.ServiceConfigHash != strings.ToLower(m.ServiceConfigHash) || m.Workspace != "local" || m.Host != "dns-primary" || m.Resolver != resolver || !domain.MatchString(m.ControlDomain) || m.TechnitiumUnit != "dns.service" {
 		return false
 	}
-	if m.BlockedA != "NXDOMAIN" && m.BlockedA != netip.IPv4Unspecified().String() {
-		return false
+	if m.BlockedDomain != "" || m.BlockedA != "" {
+		if !domain.MatchString(m.BlockedDomain) || m.BlockedDomain == m.ControlDomain || (m.BlockedA != "NXDOMAIN" && m.BlockedA != netip.IPv4Unspecified().String()) {
+			return false
+		}
+	}
+	if m.GuestPrefix == "" && m.GuestIngress == "" && m.IsolationRulesHash == "" && m.IsolationProof == "" {
+		return true
 	}
 	g, e := netip.ParsePrefix(m.GuestPrefix)
-	if e != nil || g.Masked().String() != m.GuestPrefix || !g.Addr().IsPrivate() || !word.MatchString(m.GuestIngress) {
-		return false
-	}
-	h, e := hex.DecodeString(m.IsolationRulesHash)
-	return e == nil && len(h) == 32 && m.Workspace == "local" && m.Host == "dns-primary" && word.MatchString(m.Interface) && m.Config == "/etc/wireguard/"+m.Interface+".conf" && m.Resolver == resolver && domain.MatchString(m.ControlDomain) && domain.MatchString(m.BlockedDomain) && m.ControlDomain != m.BlockedDomain && m.AdGuardUnit == "AdGuardHome.service" && m.IsolationProof == "/var/lib/21pins/dns-admin/guest-proof.json"
+	h, e2 = hex.DecodeString(m.IsolationRulesHash)
+	return e == nil && g.Masked().String() == m.GuestPrefix && g.Addr().IsPrivate() && word.MatchString(m.GuestIngress) && e2 == nil && len(h) == 32 && m.IsolationProof == "/var/lib/21pins/dns-admin/guest-proof.json"
 }
 
 // Root ownership, nonsymlink regular file and nonwritable ancestors are checked before fd read.
@@ -214,7 +220,7 @@ func Run(args []string) (Result, error) {
 		return r, Denied
 	}
 	defer syscall.Flock(fd, syscall.LOCK_UN)
-	x := engine{m: m, dir: stateDir, run: native, read: func(p string) ([]byte, error) { return trusted(p, true) }, now: time.Now}
+	x := engine{m: m, dir: stateDir, run: native, read: func(p string) ([]byte, error) { return trusted(p, p != "/etc/systemd/system/dns.service") }, now: time.Now}
 	return x.operation(args[0])
 }
 func parsePeers(b []byte) (map[string][]netip.Prefix, error) {
@@ -576,8 +582,9 @@ func preserved(before, after map[string][]netip.Prefix, key string) bool {
 	}
 	return true
 }
-func (x engine) dns(name string, want string) bool {
-	b, e := x.run("/usr/bin/dig", "@"+resolver, name, "A", "+time=2", "+tries=1", "+noall", "+comments", "+answer")
+func (x engine) dns(name string, want string, extra ...string) bool {
+	args := []string{"@" + resolver, name, "A", "+time=2", "+tries=1", "+noall", "+comments", "+answer"}
+	b, e := x.run("/usr/bin/dig", append(args, extra...)...)
 	if e != nil {
 		return false
 	}
@@ -615,6 +622,10 @@ type guestProof struct {
 
 func (x engine) operation(op string) (Result, error) {
 	r := Result{Operation: op, State: "denied"}
+	if (strings.HasPrefix(op, "peer-") || strings.HasPrefix(op, "wg-")) && x.m.Interface == "" {
+		r.State = "wireguard_prerequisites_unavailable"
+		return r, Denied
+	}
 	switch op {
 	case "peer-enroll":
 		r, e := x.enroll()
@@ -674,17 +685,33 @@ func (x engine) operation(op string) (Result, error) {
 	case "dns-query", "dns-test":
 		r.Verified = x.dns(x.m.ControlDomain, x.m.ControlA)
 		if op == "dns-test" {
-			r.Verified = r.Verified && x.dns(x.m.BlockedDomain, x.m.BlockedA)
+			r.Verified = r.Verified && x.dns(x.m.ControlDomain, x.m.ControlA, "+tcp")
 		}
 		r.State = "dns_checked"
-	case "adguard-status", "adguard-filtering":
-		_, e := x.run("/usr/bin/systemctl", "is-active", "--quiet", x.m.AdGuardUnit)
-		r.Verified = e == nil
-		if op == "adguard-filtering" {
-			r.Verified = r.Verified && x.dns(x.m.ControlDomain, x.m.ControlA) && x.dns(x.m.BlockedDomain, x.m.BlockedA)
+	case "technitium-status", "technitium-filtering":
+		if op == "technitium-filtering" && (x.m.BlockedDomain == "" || x.m.BlockedA == "") {
+			r.State = "filter_probe_unconfigured"
+			return r, Denied
 		}
-		r.State = "adguard_checked"
+		b, e := x.read("/etc/systemd/system/dns.service")
+		if e != nil || digest(b) != x.m.ServiceConfigHash {
+			return r, Denied
+		}
+		b, e = x.run("/usr/bin/systemctl", "show", "--property=DropInPaths", "--value", x.m.TechnitiumUnit)
+		if e != nil || len(bytes.TrimSpace(b)) != 0 {
+			return r, Denied
+		}
+		_, e = x.run("/usr/bin/systemctl", "is-active", "--quiet", x.m.TechnitiumUnit)
+		r.Verified = e == nil
+		if op == "technitium-filtering" {
+			r.Verified = r.Verified && x.dns(x.m.ControlDomain, x.m.ControlA) && x.dns(x.m.ControlDomain, x.m.ControlA, "+tcp") && x.dns(x.m.BlockedDomain, x.m.BlockedA) && x.dns(x.m.BlockedDomain, x.m.BlockedA, "+tcp")
+		}
+		r.State = "technitium_checked"
 	case "guest-isolation":
+		if x.m.GuestPrefix == "" || x.m.IsolationProof == "" {
+			r.State = "guest_origin_prerequisites_unavailable"
+			return r, Denied
+		}
 		b, e := x.run("/usr/sbin/nft", "--stateless", "--json", "list", "ruleset")
 		if e != nil {
 			return r, e

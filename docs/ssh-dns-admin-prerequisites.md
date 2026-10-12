@@ -1,28 +1,24 @@
-# VM220 prerequisites — planning only, no mutation approval
+# Technitium role — corrected prerequisites and trust boundary
 
-Pi reads local context and presents decisions here/in the conversation; the owner need not open files or retrieve safely accessible information.
+Owner selected existing Technitium. No manual file-opening/dashboard retrieval is required: Pi reads context, decides what matters and presents exact approval in the conversation.
 
-Fresh reconciliation confirms VM220 has working Technitium DNS but no configured WireGuard or AdGuard. Known VM221/management-host checks and a filtered DNS/VPN VM/container lookup found no alternate authority. This bounded discovery does not exclude an unknown external/router service.
+## Service placement, not new provisioning
 
-The original nine-command role remains implemented, isolated-tested and inactive. Do not install a role with fake manifest pins or rename Technitium as AdGuard.
+WG already exists on VM205 `wg-gateway`, not VM220. The Beryl-address peer is live/persistent with a recent handshake. Do not install WG/AdGuard on VM220, replace Technitium, create a new public listener or grant gateway privilege under a DNS-only approval. Earlier absence conclusions from a name-only lookup are withdrawn.
 
-## Safe default
+VM220 local fixed-resolver UDP/TCP localhost probes pass. Gateway-LAN-source queries from `10.77.0.13` time out; read-only ACL diagnosis finds source-restricted hypervisor forwarding, with exact Beryl source `10.66.66.5` already allowed but gateway `.13` not permitted. Do not "repair" the policy with broad LAN allowance. Actual Beryl-origin DNS remains unproven; a gateway-origin probe is not equivalent. Detailed final facts remain owned by the minimized ops report.
 
-Preserve existing Technitium and its working private resolver. Keep CA/requester keys and API tokens on Mac. Reuse the approved management bastion for certificate SSH only. Do not assume its TCP -W channel transports WireGuard UDP or proves Beryl endpoint reachability.
+## Technitium-only profile ready for trust-stage review
 
-## Prerequisites if the original WireGuard/AdGuard semantics are retained
+- Fixed private resolver and actual root unit-file SHA256; no service drop-ins permitted.
+- Exact control pin `localhost A 127.0.0.1` proved over both UDP/TCP from VM220.
+- Five signed literal commands: DNS query/test, Technitium status/filtering, guest isolation.
+- **Three baseline checks usable.** Filtering lacks a reviewed blocked-domain pin; guest isolation lacks real independently generated origin evidence. Both deny with nonzero exit before native calls. No invented success/proof/config values.
+- Production profile contains no WG interface/peer/config and rejects attempts to add them. Public dispatch/rules/sudoers grant no Beryl/WG operation. Existing stage-only enrollment code does not expose a production entry point.
+- Root service/native binaries and configuration are TCB; unit pin/drop-in rejection is not executable/library/socket attestation.
 
-1. Select the actual service authority and existing Beryl public-identity reference. No generated replacement peer identity, private-key retrieval or credential copying.
-2. Review Beryl-to-WireGuard private endpoint reachability separately. A Mac SSH bastion success does not authorize a public UDP listener, routing/firewall exposure or a new permanent trust path. No guessed endpoint/port/host.
-3. Prepare separately reviewed operator provisioning for WG tools/interface/private config and any required routes/firewall restrictions. None of this belongs to the dns-admin role, which remains incapable of packages/generic network commands.
-4. Select an AdGuard deployment or actual existing authority without silently replacing Technitium or changing the resolver pipeline. Any service/filtering integration is a separately reviewed production change; no presumed DNS listener takeover/upstream selection.
-5. Obtain real control/blocked DNS test pins and independently verifiable guest-origin TCP/UDP evidence. Do not manufacture attestation files from a local DNS check.
-6. Only then build the real digest-bound root manifest, exact sudoers/gate/account/trust candidate and repeat read-only native/recovery preflight. Present the exact one-time trust installation approval in Pi. Backend provisioning, Beryl enrollment and real packet tests retain their distinct approvals.
+## Exact next owner boundary
 
-## Owner-only decision
+One-time VM220 **SSH capability trust installation only**: separate unprivileged `pins-dns-agent`, trusted dash/root-empty home/no generic sudo; existing public CA trust, static root gate, principals/policy, real DNS-only manifest, installed private lock/state and five exact digest-bound sudo entries. Preserve original SSH config/accounts as root-only recovery backup; native validate/recovery checks before safe SSH reload. Then actual Mac→existing bastion→VM220 certificate/command/lifecycle smoke and ephemeral cleanup.
 
-The discrepancy changes the intended service/backend scope. Pi may safely prepare plans and tests without approval, but cannot choose a different privileged service/host or authorize production prerequisites itself.
-
-Recommended direction: use existing Technitium for DNS-specific administration, with WireGuard enrollment explicitly unavailable until its separate prerequisites are approved. Alternatively retain the original AdGuard/WireGuard requirements and review the prerequisite deployment as an additional change, not a trust-only installation.
-
-No live target, issuer registration, trust, service, package, network or peer changes were performed during reconciliation.
+This does not authorize DNS/filtering/service/package/network/firewall changes, WG205 access or peer enrollment. No gateway `.13` DNS allowance is requested. Real Beryl traffic/guest validation and future capability/pin changes retain their separate gates. No target trust/issuer host registration/certificate has been installed/issued yet.
