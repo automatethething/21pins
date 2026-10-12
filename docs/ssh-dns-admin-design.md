@@ -41,7 +41,7 @@ Force-command rules digest: `c14d60af957ce2a432d6dab344d2f346081c03b1eacd958881d
 
 Exact root execution and argv/digest validation before parsing; strict JSON unknown/trailing fields rejected. Root-owned regular nonsymlink files/ancestors, private manifest/state/installed nonblocking lock. Fixed native tools, clean minimal environment, ≤4s native timeouts/bounded output. No read-only operation creates configuration, packages, proof or provider state. Service unit may be root-readable 0644 but not writable/non-root/symlink; manifest/lock/proof remain root-private.
 
-Any denied/missing proof yields nonzero CLI/SSH exit and `verified:false`. Native root/helper and native SSH gate failure propagation are separately exercised; fixture tests are never labeled real packet/production cert-sudo proof.
+Any denied/missing proof yields nonzero CLI/SSH exit and `verified:false`. Native root/helper and native SSH gate failure propagation are separately exercised; after explicit installation approval, actual target certificate→gate→sudo→root-helper baseline/negative checks also pass. Fixture tests are never labeled real guest/client packet proof.
 
 ## Validation and activation gate
 
@@ -49,4 +49,4 @@ Go/race/vet, manifest/ownership/digest/privilege tests; root Linux chroot produc
 
 Read-only actual VM220 prospective SSH candidate validates from `/dev/stdin`, preserves **29** recovery contexts, disables forwarding/TTY/user environments and installs nothing. Real unit pin/no-dropins and local UDP+TCP loopback DNS checks pass; management private target SSH is reachable.
 
-No VM220 trust/account/config/service/package/network/peer changes or real dns-admin issuer registration/certificates yet. CA private/signing agent/requester keys/tokens remain on Mac. Future exact one-time trust approval is limited to account/gate/public CA/principals/policy/manifest/lock/exact sudoers and safe SSH validation/reload; no DNS replacement, WG gateway access/enrollment, filtering reconfiguration or firewall repair is included. [Prerequisites and corrected reachability gate](ssh-dns-admin-prerequisites.md).
+Owner **y** approved and completed only VM220 account/gate/public CA/principals/policy/manifest/lock/exact sudoers and safe SSH reload. Real local issuer DNS-only scope is registered; fresh actual Mac certificate baseline/negative/renewal/completion smoke passes, and all29 original recovery contexts remain unchanged. CA private/signing agent/requester keys/tokens stay on Mac. No DNS/service/package/network/peer changes, WG gateway access/enrollment, filtering reconfiguration or firewall repair. [Actual install/dogfood evidence](ssh-vm220-technitium-dogfood.md) · [Corrected prerequisites](ssh-dns-admin-prerequisites.md).

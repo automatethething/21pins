@@ -17,8 +17,8 @@ VM220 local fixed-resolver UDP/TCP localhost probes pass. Gateway-LAN-source que
 - Production profile contains no WG interface/peer/config and rejects attempts to add them. Public dispatch/rules/sudoers grant no Beryl/WG operation. Existing stage-only enrollment code does not expose a production entry point.
 - Root service/native binaries and configuration are TCB; unit pin/drop-in rejection is not executable/library/socket attestation.
 
-## Exact next owner boundary
+## Approved installation completed
 
 One-time VM220 **SSH capability trust installation only**: separate unprivileged `pins-dns-agent`, trusted dash/root-empty home/no generic sudo; existing public CA trust, static root gate, principals/policy, real DNS-only manifest, installed private lock/state and five exact digest-bound sudo entries. Preserve original SSH config/accounts as root-only recovery backup; native validate/recovery checks before safe SSH reload. Then actual Mac→existing bastion→VM220 certificate/command/lifecycle smoke and ephemeral cleanup.
 
-This does not authorize DNS/filtering/service/package/network/firewall changes, WG205 access or peer enrollment. No gateway `.13` DNS allowance is requested. Real Beryl traffic/guest validation and future capability/pin changes retain their separate gates. No target trust/issuer host registration/certificate has been installed/issued yet.
+This does not authorize DNS/filtering/service/package/network/firewall changes, WG205 access or peer enrollment. No gateway `.13` DNS allowance is requested. Real Beryl traffic/guest validation and future capability/pin changes retain their separate gates. Owner **y** approved this scope. Trust installation and local host registration are complete; actual Mac→bastion→VM220 certificate baseline/negative/renewal/completion smoke passes53.78s. All29 recovery contexts preserved, native sudo positives/negatives and artifact ownership verified. The next changes are not implicitly approved: WG205 authority, filter pins/config or guest/client packet proof remain separate. See `ssh-vm220-technitium-dogfood.md`.
