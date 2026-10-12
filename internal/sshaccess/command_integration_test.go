@@ -3,6 +3,7 @@ package sshaccess
 import (
 	"context"
 	"fmt"
+	"github.com/petrichor/21pins-cli/internal/dnsadmin"
 	"github.com/petrichor/21pins-cli/internal/sshcommand"
 	"net"
 	"os"
@@ -16,6 +17,21 @@ import (
 )
 
 func TestIsolatedCommandAuthority(t *testing.T) {
+	runIsolatedRoleGate(t, "observe", []sshcommand.Rule{{Command: []string{"platform"}, Exec: []string{"/usr/bin/uname", "-s"}}})
+}
+func TestIsolatedDNSAdminAuthority(t *testing.T) {
+	rules, e := dnsadmin.Rules(strings.Repeat("a", 64))
+	if e != nil {
+		t.Fatal(e)
+	}
+	// Native SSH fixture proves literal operation dispatch, not production sudo/kernel WG.
+	for i := range rules {
+		rules[i].Exec = []string{"/usr/bin/printf", "fixture-" + dnsadmin.Operations[i]}
+	}
+	runIsolatedRoleGate(t, "dns-admin", rules)
+}
+func runIsolatedRoleGate(t *testing.T, role string, rules []sshcommand.Rule) {
+	allowed := strings.Join(rules[0].Command, " ")
 	if os.Getenv("PINS21_SSH_INTEGRATION") != "1" {
 		t.Skip("isolated native SSH opt-in")
 	}
@@ -41,8 +57,8 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 	key := nativeKey(t, dir, "client")
 	hostkey := nativeKey(t, dir, "host")
 	pub, _ := os.ReadFile(key + ".pub")
-	gate := sshcommand.Authority{Binary: binary, PolicyFile: filepath.Join(dir, "bundle", "commands.json"), Fixture: true, Rules: []sshcommand.Rule{{Command: []string{"platform"}, Exec: []string{"/usr/bin/uname", "-s"}}}}
-	cfg := Config{Workspace: "fixture", CA: CA{Mode: "dev", PublicKeyFile: ca + ".pub", SecretRef: ca}, CertTTL: "20s", RenewBefore: "5s", ClockSkew: "1s", Hosts: map[string]Host{"alpha": {Alias: "alpha", Roles: map[string]Role{"observe": {SSHUser: who.Username, DefaultLease: "1m", MaxLease: "2m", MaxCertTTL: "20s", Requesters: map[string]string{"pi": "preapproved"}, CommandAuthority: &gate}}}}}
+	gate := sshcommand.Authority{Binary: binary, PolicyFile: filepath.Join(dir, "bundle", "commands.json"), Fixture: true, Rules: rules}
+	cfg := Config{Workspace: "fixture", CA: CA{Mode: "dev", PublicKeyFile: ca + ".pub", SecretRef: ca}, CertTTL: "20s", RenewBefore: "5s", ClockSkew: "1s", Hosts: map[string]Host{"alpha": {Alias: "alpha", Roles: map[string]Role{role: {SSHUser: who.Username, DefaultLease: "1m", MaxLease: "2m", MaxCertTTL: "20s", Requesters: map[string]string{"pi": "preapproved"}, CommandAuthority: &gate}}}}}
 	svc, e := New(filepath.Join(dir, "state"), cfg, NativeSigner{CA: cfg.CA})
 	if e != nil {
 		t.Fatal(e)
@@ -51,7 +67,7 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 	if BootstrapBundle(cfg, "alpha", bundle) != nil {
 		t.Fatal("gated bundle")
 	}
-	force, _ := gate.ForcedCommand("fixture", "alpha", "observe", who.Username)
+	force, _ := gate.ForcedCommand("fixture", "alpha", role, who.Username)
 	listener, e := net.Listen("tcp", "127.0.0.1:0")
 	if e != nil {
 		t.Fatal(e)
@@ -108,7 +124,7 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 	known := filepath.Join(dir, "known_hosts")
 	os.WriteFile(known, []byte("[127.0.0.1]:"+strconv.Itoa(port)+" "+strings.TrimSpace(string(hp))+"\n"), 0600)
 	actor := Actor{ID: "fixture", Name: "pi"}
-	q := OpenRequest{HostID: "alpha", RoleID: "observe", AgentClass: "pi", ObjectiveID: "command-check", Purpose: "synthetic", PublicKey: strings.TrimSpace(string(pub))}
+	q := OpenRequest{HostID: "alpha", RoleID: role, AgentClass: "pi", ObjectiveID: "command-check", Purpose: "synthetic", PublicKey: strings.TrimSpace(string(pub))}
 	lease, e := svc.Open(actor, q)
 	if e != nil {
 		t.Fatal(e)
@@ -126,6 +142,9 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 	install(issued.Certificate)
 	base := []string{"-F", "/dev/null", "-p", strconv.Itoa(port), "-l", who.Username, "-i", key, "-o", "CertificateFile=" + key + "-cert.pub", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + known, "-o", "ControlMaster=no", "-o", "ConnectTimeout=2"}
 	run := func(command string, extra ...string) ([]byte, error) {
+		if command == "platform" {
+			command = allowed
+		}
 		ctx, c := context.WithTimeout(context.Background(), 8*time.Second)
 		defer c()
 		args := append(append([]string{}, base...), extra...)
@@ -134,8 +153,15 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 		cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + dir}
 		return cmd.Output()
 	}
-	if out, e := run("'platform'"); e != nil || strings.TrimSpace(string(out)) == "" {
-		t.Fatal("allowed operation denied")
+	for _, r := range rules {
+		if out, e := run(strings.Join(r.Command, " ")); e != nil || strings.TrimSpace(string(out)) == "" {
+			t.Fatal("allowed operation denied")
+		}
+	}
+	for _, s := range []string{allowed + " extra", allowed + ";id", allowed + " $(id)", "sudo /bin/sh", "dns query altered"} {
+		if _, e := run(s); e == nil {
+			t.Fatal("dns/root argument bypass")
+		}
 	}
 	for _, cmd := range []string{"", "sh -c id", "platform; id", "platform && id", "platform | id", "$(id)", "`id`", "platform > /tmp/escape", "'platform' '-a'", "/usr/bin/uname -s", force, "sftp", "platform\nid"} {
 		if _, e := run(cmd); e == nil {
@@ -168,7 +194,7 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 		t.Fatal("certificate forced command mismatch accepted")
 	}
 	bad.ForceCommand = force
-	bad.Principal = "21pins:fixture:alpha:dns-admin"
+	bad.Principal = "21pins:fixture:alpha:wrong-role"
 	badCert, e = native.Sign(bad)
 	if e != nil {
 		t.Fatal(e)
@@ -200,7 +226,7 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 	// A root-side allowlist change cannot silently broaden an already signed role version.
 	policyPath := filepath.Join(bundle, "commands.json")
 	originalPolicy, _ := os.ReadFile(policyPath)
-	altered := strings.Replace(string(originalPolicy), `"-s"`, `"-a"`, 1)
+	altered := strings.Replace(string(originalPolicy), rules[0].Exec[len(rules[0].Exec)-1], "altered-exec", 1)
 	os.WriteFile(policyPath, []byte(altered), 0600)
 	if _, e := run("platform"); e == nil {
 		t.Fatal("policy digest mismatch bypass")
@@ -211,7 +237,7 @@ func TestIsolatedCommandAuthority(t *testing.T) {
 		t.Fatal(e)
 	}
 	install(renewed.Certificate)
-	if _, e := run("platform"); e != nil {
+	if _, e := run(allowed); e != nil {
 		t.Fatal("same-key renewal gate failed")
 	}
 	if _, e = svc.Close(actor, lease.ID, Completed, "complete"); e != nil {

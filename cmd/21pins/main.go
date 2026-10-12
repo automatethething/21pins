@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/petrichor/21pins-cli/internal/config"
+	"github.com/petrichor/21pins-cli/internal/dnsadmin"
 	"github.com/petrichor/21pins-cli/internal/gateway"
 	"github.com/petrichor/21pins-cli/internal/hosted"
 	"github.com/petrichor/21pins-cli/internal/identity"
@@ -25,6 +26,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Privileged pinned helper must never initialize unrelated issuer/provider state.
+	if os.Args[1] == "dns-admin" {
+		r, e := dnsadmin.Run(os.Args[2:])
+		printJSON(r)
+		if e != nil {
+			os.Exit(1)
+		}
+		return
+	}
 	// SSH requester operations are API clients: never load issuer/provider state.
 	if os.Args[1] == "ssh" && len(os.Args) > 2 && os.Args[2] != "ca" && os.Args[2] != "host" {
 		handleSSH(nil, os.Args[2:])

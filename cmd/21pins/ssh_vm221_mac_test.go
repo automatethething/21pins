@@ -46,10 +46,14 @@ func TestApprovedVM221MacBastionCLI(t *testing.T) {
 	}
 	server := httptest.NewServer(gateway.NewServer(st, gateway.Config{SSHDir: issuer}).Handler())
 	defer server.Close()
-	binary := filepath.Join(dir, "21pins")
-	build := exec.Command("go", "build", "-o", binary, ".")
-	if build.Run() != nil {
-		t.Fatal("native CLI build")
+	binary := os.Getenv("PINS21_VM221_DOGFOOD_BINARY")
+	if binary == "" {
+		binary = filepath.Join(dir, "21pins")
+		if exec.Command("go", "build", "-o", binary, ".").Run() != nil {
+			t.Fatal("native CLI build")
+		}
+	} else if !filepath.IsAbs(binary) {
+		t.Fatal("explicit tested binary must be absolute")
 	}
 	env := sshTransportEnv(os.Environ())
 	env = append(env, "PINS21_SSH_API_URL="+server.URL, "PINS21_SSH_RUNTIME_DIR="+filepath.Join(dir, "runtime"), "PINS21_SSH_CONFIG_FILE="+filepath.Join(issuer, "ssh_config_vm221"))
