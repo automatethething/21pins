@@ -13,16 +13,24 @@ Optional validation: `--validate-config <locally-prepared-candidate-sshd-config>
 
 Actual host trust installation is a separate owner/admin action. There is deliberately no implicit sudo/remote admin credential handoff. After installation, no per-lease host modification or callback is needed.
 
+## Dedicated noninteractive account defense in depth
+
+For a dedicated `pins-agent` observe account, use the exact proposed [restriction fragment](ssh-pins-agent-match.conf). Append its `Match User pins-agent` block at EOF of the reviewed main configuration, not an early Include where later global directives could fall inside Match. Keep public-key/certificate authentication enabled; disable ordinary authorized-key file/command lookup, alternate principal commands, PTY, all forwarding (including Unix sockets), tunnels and user rc. Do not mistake these restrictions for a shell/data sandbox.
+
+Prefer scoping `TrustedUserCAKeys /etc/ssh/21pins/ca.pub` and `AuthorizedPrincipalsFile /etc/ssh/21pins/principals/%u` inside that same account's Match block rather than globally changing admin/recovery users. Validate keyword support, real public CA/principal contents and the complete candidate before any approved installation. `PermitUserEnvironment` is global-only on some supported systems; check effective `no` rather than placing an unsupported directive in Match.
+
+Verify dedicated-account no-sudo with `sudo -l -U pins-agent` after separately approved account creation and before enabling trust/access; an absent account or policy error is not proof of denial. Keep it out of admin/sudo groups and privileged filesystem/service permissions. Re-run native per-account/context comparisons against the current configuration and verify real certificate/PAM account eligibility. The account restrictions intentionally prohibit interactive PTY even if a certificate mistakenly grants it.
+
 ## Trust installation checklist (Linux example; owner only)
 
 1. Select a non-production test machine and a dedicated, least-privilege Unix account. Establish and verify its host key independently. Keep an existing admin session and console/recovery route open.
 2. Review generated public CA fingerprint, unique host identity, role/user mapping and intended privileges. Never copy the signing-agent socket, CA private file, agent private key or tokens to the target.
 3. Back up the existing sshd configuration and current CA/principals files to a root-only directory. Record an exact rollback procedure. Review existing `TrustedUserCAKeys`, includes and Match blocks; do not blindly replace a previously trusted CA or assume repeated directives merge.
-4. Merge the fragment into the candidate configuration. Example final paths:
+4. Merge the fragment into the candidate configuration. Example final paths (use `pins-agent` for the dedicated-account review):
    - `/etc/ssh/21pins/ca.pub` (root-owned public CA file).
-   - `/etc/ssh/21pins/principals/agentdev` (root-owned public principal allowlist).
-   - `TrustedUserCAKeys /etc/ssh/21pins/ca.pub`.
-   - `AuthorizedPrincipalsFile /etc/ssh/21pins/principals/%u`.
+   - `/etc/ssh/21pins/principals/pins-agent` (root-owned public principal allowlist).
+   - For a dedicated agent account, `TrustedUserCAKeys /etc/ssh/21pins/ca.pub` inside its Match block.
+   - `AuthorizedPrincipalsFile /etc/ssh/21pins/principals/%u` in that same block. Do not globally change existing recovery accounts.
 5. Install public files with root ownership, directories 0755 and files 0644; writable only by administrators. Preserve existing trust or explicitly approve its replacement. Disable normal authorized-key/password access for the dedicated account if the temporary-cert property must be exclusive. Never disable other users' recovery access.
 6. Validate the complete candidate with native `sshd -t -f <candidate>` and inspect effective configuration for the test account using `sshd -T -C ...` with locally supplied synthetic/test connection context. Do not paste raw diagnostics or real addresses into chat.
 7. Atomically install the validated configuration, run `sshd -t` again, and reload the existing service with its platform-native reload operation (for example `systemctl reload sshd`, or `ssh` on distributions using that unit name). Do not restart blindly. Keep the admin connection open.
