@@ -58,6 +58,7 @@ type Result struct {
 	State            string `json:"state"`
 	PeerCount        int    `json:"peer_count,omitempty"`
 	HandshakeRecent  bool   `json:"handshake_recent,omitempty"`
+	HandshakeAt      int64  `json:"handshake_at,omitempty"`
 	GuestPolicy      bool   `json:"guest_policy,omitempty"`
 	GuestPacketProof bool   `json:"guest_packet_proof,omitempty"`
 }
@@ -371,7 +372,7 @@ func (x engine) verify() (Result, error) {
 		return r, Denied
 	}
 	a, e := x.live()
-	if e != nil {
+	if e != nil || !equalPeers(p, a) {
 		return r, Denied
 	}
 	pOK, e := check(p, x.m.Peer)
@@ -517,7 +518,7 @@ func (x engine) enroll() (Result, error) {
 		return r, e
 	}
 	aOK, e := check(live, x.m.Peer)
-	if e != nil || pOK != aOK {
+	if e != nil || pOK != aOK || !equalPeers(p, live) {
 		return r, Denied
 	}
 	if pOK {
@@ -675,6 +676,9 @@ func (x engine) operation(op string) (Result, error) {
 			}
 			age := x.now().Sub(time.Unix(stamp, 0))
 			r.HandshakeRecent = stamp > 0 && age >= 0 && age <= 3*time.Minute
+			if r.HandshakeRecent {
+				r.HandshakeAt = stamp
+			}
 		}
 		if !seen || !r.HandshakeRecent {
 			return r, Denied

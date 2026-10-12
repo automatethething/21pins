@@ -33,6 +33,16 @@ func TestIsolatedDNSAdminAuthority(t *testing.T) {
 	}
 	runIsolatedRoleGate(t, "dns-admin", rules)
 }
+func TestIsolatedWGBerylAuthority(t *testing.T) {
+	rules, e := dnsadmin.WireGuardRules(strings.Repeat("a", 64))
+	if e != nil {
+		t.Fatal(e)
+	}
+	for i := range rules {
+		rules[i].Exec = []string{"/usr/bin/printf", "fixture-" + dnsadmin.WireGuardOperations[i]}
+	}
+	runIsolatedRoleGate(t, "wg-beryl", rules)
+}
 func runIsolatedRoleGate(t *testing.T, role string, rules []sshcommand.Rule) {
 	allowed := strings.Join(rules[0].Command, " ")
 	if os.Getenv("PINS21_SSH_INTEGRATION") != "1" {
@@ -169,6 +179,13 @@ func runIsolatedRoleGate(t *testing.T, role string, rules []sshcommand.Rule) {
 		}
 	}
 	for _, s := range []string{allowed + " extra", allowed + ";id", allowed + " $(id)", "sudo /bin/sh", "dns query altered", "beryl enroll", "beryl verify", "wireguard state", "wireguard handshake", "adguard status", "adguard filtering"} {
+		authorized := false
+		for _, r := range rules {
+			authorized = authorized || s == strings.Join(r.Command, " ")
+		}
+		if authorized {
+			continue
+		}
 		if _, e := run(s); e == nil {
 			t.Fatal("dns/root argument bypass")
 		}

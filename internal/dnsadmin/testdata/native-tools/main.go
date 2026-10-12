@@ -7,12 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
 func main() {
 	a := os.Args[1:]
-	b, _ := os.ReadFile("/var/lib/21pins/dns-admin/fixture.json")
+	dir := "/var/lib/21pins/dns-admin"
+	if filepath.Base(os.Args[0]) == "wg" {
+		dir = "/var/lib/21pins/wg-beryl"
+	}
+	b, _ := os.ReadFile(dir + "/fixture.json")
 	var m struct {
 		Peer    string
 		Other   string
@@ -22,7 +27,7 @@ func main() {
 	json.Unmarshal(b, &m)
 	switch filepath.Base(os.Args[0]) {
 	case "wg":
-		p := "/var/lib/21pins/dns-admin/live.json"
+		p := dir + "/live.json"
 		b, _ := os.ReadFile(p)
 		live := map[string]string{}
 		json.Unmarshal(b, &live)
@@ -41,6 +46,11 @@ func main() {
 			}
 		}
 		if len(a) == 6 && strings.Join(a[:3], " ") == "set wg0 peer" && a[3] == m.Peer && a[4] == "allowed-ips" && a[5] == "10.66.66.5/32" {
+			if _, e := os.Stat(dir + "/kill-before-live"); e == nil {
+				os.Remove(dir + "/kill-before-live")
+				syscall.Kill(os.Getppid(), syscall.SIGKILL)
+				os.Exit(1)
+			}
 			live[m.Peer] = a[5]
 			b, _ = json.Marshal(live)
 			os.WriteFile(p, b, 0600)

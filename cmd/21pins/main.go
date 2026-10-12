@@ -27,8 +27,14 @@ func main() {
 	}
 
 	// Privileged pinned helper must never initialize unrelated issuer/provider state.
-	if os.Args[1] == "dns-admin" {
-		r, e := dnsadmin.Run(os.Args[2:])
+	if os.Args[1] == "dns-admin" || os.Args[1] == "wg-beryl" {
+		var r dnsadmin.Result
+		var e error
+		if os.Args[1] == "wg-beryl" {
+			r, e = dnsadmin.RunWireGuard(os.Args[2:])
+		} else {
+			r, e = dnsadmin.Run(os.Args[2:])
+		}
 		printJSON(r)
 		if e != nil {
 			os.Exit(1)
