@@ -10,7 +10,7 @@ Therefore the requested WireGuard/AdGuard authority is not presently backed by r
 
 ## Immutable least-privilege role
 
-Separate Unix account `pins-dns-agent`, only its primary group, no ordinary keys/passwords, root-owned empty HOME and trusted noninjectable login shell. Host `dns-primary`, role `dns-admin`, workspace `local`, dedicated principal, exact signed/principals/server force-command and command rules digest. Do not share observe's Unix user. Requester `pi`, explicit owner approval, recommended default lease 15m/hard ceiling 30m/certificates ≤5m, no preapproval/PTY/forwarding/tunnels/subsystems. Existing approved `fipi` bastion is explicit host/lease policy, never an inherited arbitrary proxy; all CA/requester private keys/socket/API tokens stay on Mac.
+Separate Unix account `pins-dns-agent`, only its primary group, no ordinary keys/passwords, root-owned empty HOME and trusted noninjectable login shell. Host `dns-primary`, role `dns-admin`, workspace `local`, dedicated principal, exact signed/principals/server force-command and command rules digest. Do not share observe's Unix user. Requester `pi`, explicit owner approval, review-only `sshaccess.DNSAdminHost` factory fixes default lease 15m/hard ceiling 30m/certificates ≤5m, no preapproval/PTY/forwarding/tunnels/subsystems. Existing approved `fipi` bastion is explicit host/lease policy, never an inherited arbitrary proxy; all CA/requester private keys/socket/API tokens stay on Mac.
 
 | Literal operation | Fixed helper operation |
 | --- | --- |
@@ -26,7 +26,7 @@ Separate Unix account `pins-dns-agent`, only its primary group, no ordinary keys
 
 Each maps to **exact** `/usr/bin/sudo -n /usr/local/bin/21pins dns-admin OP SHA256_MANIFEST`. No caller argument is interpolated or forwarded to tools. Root helper rejects nonroot, extra args, unknown operations, changed manifest bytes/digest, symlink/untrusted ownership/permissions/ancestors. Digest is included in every fixed Exec argv, so signed command rules and exact sudoers bind the manifest as well as the operation. Changing peer/interface/test domains/firewall evidence pins requires a new reviewed manifest, rules version, sudoers and approval; old certificates fail closed.
 
-`internal/dnsadmin.Rules` and `Sudoers` produce the nine mappings and exact argument strings. Sudoers permits only these entries as root, NOPASSWD/NOSETENV, env_reset, !setenv, secure native path; no wildcards, generic sudo/wg/ip/dig/systemctl, shell, package manager, arbitrary paths, input config or environment preservation. Gate/user/host/role isolation remains the existing native OpenSSH enforcement, not purpose text.
+`sshaccess.DNSAdminHost` builds this exact non-fixture, explicit-approval policy without registration/install; unit tests reject >30m requests, unapproved signing, self-approval and altered jump scope. `internal/dnsadmin.Rules` and `Sudoers` produce the nine mappings and exact argument strings. Sudoers permits only these entries as root, NOPASSWD/NOSETENV, env_reset, !setenv, secure native path; no wildcards, generic sudo/wg/ip/dig/systemctl, shell, package manager, arbitrary paths, input config or environment preservation. Gate/user/host/role isolation remains the existing native OpenSSH enforcement, not purpose text.
 
 ## Root helper and manifest
 
