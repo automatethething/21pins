@@ -55,8 +55,9 @@ type Role struct {
 	CommandAuthority      *sshcommand.Authority `json:"command_authority,omitempty"`
 }
 type Host struct {
-	Alias string          `json:"ssh_alias"`
-	Roles map[string]Role `json:"roles"`
+	Alias     string          `json:"ssh_alias"`
+	JumpAlias string          `json:"ssh_jump_alias,omitempty"`
+	Roles     map[string]Role `json:"roles"`
 }
 type CA struct {
 	Mode          string `json:"mode"`
@@ -93,6 +94,7 @@ type Lease struct {
 	RoleID               string     `json:"role_id"`
 	SSHUser              string     `json:"ssh_user"`
 	SSHAlias             string     `json:"ssh_alias"`
+	SSHJumpAlias         string     `json:"ssh_jump_alias,omitempty"`
 	RenewBefore          string     `json:"renew_before"`
 	ObjectiveID          string     `json:"objective_id"`
 	Purpose              string     `json:"purpose"`
@@ -216,7 +218,7 @@ func validateConfig(c Config) error {
 		return errors.New("invalid clock skew")
 	}
 	for h, v := range c.Hosts {
-		if !identifier.MatchString(h) || !identifier.MatchString(v.Alias) {
+		if !identifier.MatchString(h) || !identifier.MatchString(v.Alias) || (v.JumpAlias != "" && !identifier.MatchString(v.JumpAlias)) {
 			return errors.New("logical host/alias required")
 		}
 		users := map[string]bool{}
@@ -308,10 +310,11 @@ func scopeDigest(c Config, host, role string) string {
 	r := h.Roles[role]
 	b, _ := json.Marshal(struct {
 		Workspace, Host, Role, Alias string
+		Jump                         string `json:",omitempty"`
 		Policy                       Role
 		CA                           CA
 		TTL, Skew                    string
-	}{c.Workspace, host, role, h.Alias, r, c.CA, c.CertTTL, c.ClockSkew})
+	}{c.Workspace, host, role, h.Alias, h.JumpAlias, r, c.CA, c.CertTTL, c.ClockSkew})
 	s := sha256.Sum256(b)
 	return hex.EncodeToString(s[:])
 }
@@ -395,7 +398,7 @@ func (s *Service) Open(a Actor, q OpenRequest) (Lease, error) {
 		if r.Requesters[a.Name] == "preapproved" && !r.ExplicitApproval {
 			state = Active
 		}
-		result = Lease{ID: randomID(), Workspace: s.Config.Workspace, RequesterID: a.ID, Requester: a.Name, AgentClass: q.AgentClass, HostID: q.HostID, RoleID: q.RoleID, SSHUser: r.SSHUser, SSHAlias: s.Config.Hosts[q.HostID].Alias, RenewBefore: s.Config.RenewBefore, ObjectiveID: q.ObjectiveID, Purpose: q.Purpose, PublicKeyFingerprint: fp, Principal: "21pins:" + s.Config.Workspace + ":" + q.HostID + ":" + q.RoleID, EstimatedDuration: q.EstimatedDuration, PolicyDigest: scopeDigest(s.Config, q.HostID, q.RoleID), OpenedAt: now, HardExpiresAt: now.Add(window), Status: state, EffectivePolicy: r}
+		result = Lease{ID: randomID(), Workspace: s.Config.Workspace, RequesterID: a.ID, Requester: a.Name, AgentClass: q.AgentClass, HostID: q.HostID, RoleID: q.RoleID, SSHUser: r.SSHUser, SSHAlias: s.Config.Hosts[q.HostID].Alias, SSHJumpAlias: s.Config.Hosts[q.HostID].JumpAlias, RenewBefore: s.Config.RenewBefore, ObjectiveID: q.ObjectiveID, Purpose: q.Purpose, PublicKeyFingerprint: fp, Principal: "21pins:" + s.Config.Workspace + ":" + q.HostID + ":" + q.RoleID, EstimatedDuration: q.EstimatedDuration, PolicyDigest: scopeDigest(s.Config, q.HostID, q.RoleID), OpenedAt: now, HardExpiresAt: now.Add(window), Status: state, EffectivePolicy: r}
 		d.Leases[result.ID] = result
 		return nil
 	})

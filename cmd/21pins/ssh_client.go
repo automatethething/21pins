@@ -29,6 +29,9 @@ func safeLease(l sshaccess.Lease) bool {
 			return false
 		}
 	}
+	if l.SSHJumpAlias != "" && !clientIdentifier.MatchString(l.SSHJumpAlias) {
+		return false
+	}
 	if l.Principal != "21pins:"+l.Workspace+":"+l.HostID+":"+l.RoleID {
 		return false
 	}

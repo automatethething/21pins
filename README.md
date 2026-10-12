@@ -53,7 +53,7 @@ This distinction is intentional: future agents should say “Anthropic/Claude”
 
 ## Temporary SSH access (opt-in V1)
 
-Give an AI agent temporary SSH access without permanent agent credentials. An objective work lease can last hours; native OpenSSH user certificates last minutes and renew on demand for the same immutable scope/key. SSH traffic goes directly to the target—no proxy, host daemon or session recording.
+Give an AI agent temporary SSH access without permanent agent credentials. An objective work lease can last hours; native OpenSSH user certificates last minutes and renew on demand for the same immutable scope/key. SSH authenticates end-to-end at the target—direct by default, or through an explicitly authorized [native management bastion](docs/ssh-bastion.md); no 21pins proxy service, host daemon or session recording.
 
 [SSH guide](docs/ssh-temporary-access-v1.md) · [Command authority](docs/ssh-command-authority.md) · [Threat model](docs/ssh-threat-model.md) · [Host bootstrap/dogfood plan](docs/ssh-host-bootstrap.md) · [Harness/Pi integration](docs/ssh-harness-integration.md) · [Future fixed-peer dns-admin](docs/ssh-dns-admin-design.md).
 

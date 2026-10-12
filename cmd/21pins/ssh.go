@@ -7,10 +7,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -291,7 +293,7 @@ func runSSH(st *store.Store, args []string) error {
 		}
 		fmt.Fprintln(os.Stderr, "21pins: credential expiry does not terminate established sessions or detached work; no data sandbox.")
 		cmd := exec.Command("ssh", argv...)
-		cmd.Env = withoutAgent(os.Environ())
+		cmd.Env = sshTransportEnv(os.Environ())
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -460,6 +462,19 @@ func withoutAgent(env []string) []string {
 	}
 	return out
 }
+
+// Transport and its bastion child never inherit API tokens or CA agent state.
+func sshTransportEnv(env []string) []string {
+	out := []string{}
+	for _, v := range env {
+		k, _, _ := strings.Cut(v, "=")
+		switch k {
+		case "PATH", "HOME", "USER", "LOGNAME":
+			out = append(out, v)
+		}
+	}
+	return out
+}
 func resolveAlias(alias string) (map[string]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -469,7 +484,7 @@ func resolveAlias(alias string) (map[string]string, error) {
 	}
 	args = append(args, alias)
 	cmd := exec.CommandContext(ctx, "ssh", args...)
-	cmd.Env = withoutAgent(os.Environ())
+	cmd.Env = sshTransportEnv(os.Environ())
 	b, e := cmd.Output()
 	if e != nil {
 		return nil, errors.New("local SSH alias resolution failed")
@@ -502,8 +517,26 @@ func sshArgs(l sshaccess.Lease, dir string, resolved map[string]string, interact
 	args := []string{"-F", "/dev/null", "-o", "StrictHostKeyChecking=yes", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "IdentityAgent=none", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no", "-o", "ClearAllForwardings=yes", "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "PermitLocalCommand=no", "-o", "ConnectTimeout=15", "-i", filepath.Join(dir, "id_ed25519"), "-o", "CertificateFile=" + filepath.Join(dir, "id_ed25519-cert.pub"), "-l", l.SSHUser, "-p", strconv.Itoa(port)}
 	for _, field := range []struct{ k, opt string }{{"userknownhostsfile", "UserKnownHostsFile"}, {"globalknownhostsfile", "GlobalKnownHostsFile"}, {"hostkeyalias", "HostKeyAlias"}} {
 		if v := resolved[field.k]; v != "" && v != "none" && !strings.ContainsAny(v, "\r\n\x00") {
+			// ssh -G loses quoting around a single existing filename with spaces.
+			if field.k != "hostkeyalias" && strings.ContainsAny(v, " \t") {
+				if info, e := os.Stat(v); e == nil && info.Mode().IsRegular() {
+					v = "\"" + strings.ReplaceAll(strings.ReplaceAll(v, "\\", "\\\\"), "\"", "\\\"") + "\""
+				}
+			}
 			args = append(args, "-o", field.opt+"="+v)
 		}
+	}
+	if l.SSHJumpAlias != "" {
+		if !clientIdentifier.MatchString(l.SSHJumpAlias) || !regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.:_-]*$`).MatchString(hostname) {
+			return nil, errors.New("invalid explicit bastion scope")
+		}
+		// ponytail: fixed native -W transport; no proxy grammar, credentials or nested jumps.
+		hop := []string{"ssh", "-o", "StrictHostKeyChecking=yes", "-o", "BatchMode=yes", "-o", "IdentityAgent=none", "-o", "ForwardAgent=no", "-o", "ForwardX11=no", "-o", "ClearAllForwardings=yes", "-o", "ControlMaster=no", "-o", "ControlPath=none", "-o", "ControlPersist=no", "-o", "PermitLocalCommand=no", "-o", "RequestTTY=no", "-o", "RemoteCommand=none", "-o", "ProxyJump=none", "-o", "ProxyCommand=none", "-o", "ConnectTimeout=15", "-W", net.JoinHostPort(hostname, strconv.Itoa(port)), l.SSHJumpAlias}
+		quoted := make([]string, len(hop))
+		for i, v := range hop {
+			quoted[i] = shellQuote(v)
+		}
+		args = append(args, "-o", "ProxyCommand="+strings.Join(quoted, " "))
 	}
 	if interactive {
 		args = append(args, "-tt")
@@ -622,6 +655,7 @@ func sshHost(st *store.Store, args []string) error {
 	case "add":
 		fs := flag.NewFlagSet("host add", flag.ContinueOnError)
 		alias := fs.String("alias", args[1], "local SSH alias")
+		jump := fs.String("jump-alias", "", "explicit existing management SSH alias; native -W, no agent forwarding")
 		role := fs.String("role", "observe", "role")
 		user := fs.String("user", "", "dedicated OS login")
 		maximum := fs.String("max-lease", "1h", "authorization ceiling")
@@ -672,7 +706,7 @@ func sshHost(st *store.Store, args []string) error {
 			}
 			r.CommandAuthority = &sshcommand.Authority{Binary: *gateBinary, PolicyFile: *gatePolicy, Rules: rules}
 		}
-		svc.Config.Hosts[args[1]] = sshaccess.Host{Alias: *alias, Roles: map[string]sshaccess.Role{*role: r}}
+		svc.Config.Hosts[args[1]] = sshaccess.Host{Alias: *alias, JumpAlias: *jump, Roles: map[string]sshaccess.Role{*role: r}}
 		if _, e = sshaccess.New(svc.Dir, svc.Config, svc.Signer); e != nil {
 			return e
 		}
