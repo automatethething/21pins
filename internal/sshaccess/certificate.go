@@ -95,7 +95,17 @@ func verifyCertificate(cert, caPublic string, r SignRequest) error {
 		return errors.New("certificate expiry mismatch")
 	}
 	critical, ok := str()
-	if !ok || len(critical) != 0 {
+	expectedCritical := []byte{}
+	if r.ForceCommand != "" {
+		encode := func(v []byte) []byte {
+			b := make([]byte, 4+len(v))
+			binary.BigEndian.PutUint32(b, uint32(len(v)))
+			copy(b[4:], v)
+			return b
+		}
+		expectedCritical = append(encode([]byte("force-command")), encode(encode([]byte(r.ForceCommand)))...)
+	}
+	if !ok || !bytes.Equal(critical, expectedCritical) {
 		return errors.New("unexpected critical options")
 	}
 	extensions, ok := str()

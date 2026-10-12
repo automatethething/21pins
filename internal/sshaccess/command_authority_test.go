@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// Observe names login scope, not a command whitelist. Guard against false RBAC claims.
-func TestObserveNativeCertificateHasNoCommandRestriction(t *testing.T) {
+// Legacy development signer primitive: principal names alone never enforce commands.
+// Current production service roles require the exact signed gate instead.
+func TestLegacyDevelopmentCertificateHasNoCommandRestriction(t *testing.T) {
 	if _, e := exec.LookPath("ssh-keygen"); e != nil {
 		t.Skip("native OpenSSH required")
 	}

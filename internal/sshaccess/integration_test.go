@@ -320,7 +320,7 @@ func TestIsolatedOpenSSH(t *testing.T) {
 		}
 	}
 	cli("ssh", "ca", "init", "--dev")
-	cli("ssh", "host", "add", "alpha", "--role", "observe", "--user", who.Username, "--requester", "pi", "--max-lease", "1m", "--default-lease", "30s", "--max-cert-ttl", "3s", "--preapproved")
+	cli("ssh", "host", "add", "alpha", "--role", "observe", "--user", who.Username, "--requester", "pi", "--max-lease", "1m", "--default-lease", "30s", "--max-cert-ttl", "3s", "--preapproved", "--legacy-auth-only")
 	cliBundle := filepath.Join(dir, "cli-bundle")
 	cli("ssh", "host", "bootstrap", "alpha", "--out", cliBundle, "--dry-run")
 	caBundle, _ := os.ReadFile(filepath.Join(cliBundle, "21pins-ca.pub"))

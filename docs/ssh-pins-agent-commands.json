@@ -1,0 +1,1 @@
+{"workspace_id":"local","host_id":"finland-staging-221","roles":{"observe":{"user":"pins-agent","allow":[{"command":["status"],"exec":["/usr/bin/uptime"]},{"command":["platform"],"exec":["/usr/bin/uname","-s"]},{"command":["identity"],"exec":["/usr/bin/id","-u"]}]}}}

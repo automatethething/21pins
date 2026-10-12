@@ -1,0 +1,1 @@
+command="/usr/local/bin/21pins ssh gate --policy /etc/ssh/21pins/commands.json --workspace local --host finland-staging-221 --role observe --user pins-agent --rules-digest 96f8d2393770858bd63bee4598042401bcf4c0aca3c609d63f836253619cd208",restrict 21pins:local:finland-staging-221:observe

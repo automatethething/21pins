@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/petrichor/21pins-cli/internal/config"
 	"github.com/petrichor/21pins-cli/internal/sshaccess"
+	"github.com/petrichor/21pins-cli/internal/sshcommand"
 	"github.com/petrichor/21pins-cli/internal/store"
 )
 
@@ -66,6 +68,9 @@ func handleSSH(st *store.Store, args []string) {
 func runSSH(st *store.Store, args []string) error {
 	if len(args) == 0 {
 		return errors.New("ssh subcommand required: ca|host|open|exec|connect|complete|cancel|revoke|approve|status|objective")
+	}
+	if args[0] == "gate" {
+		return sshGate(args[1:])
 	}
 	if args[0] == "ca" {
 		return sshCA(args[1:])
@@ -321,6 +326,21 @@ func runSSH(st *store.Store, args []string) error {
 		return errors.New("unknown SSH command")
 	}
 }
+func sshGate(args []string) error {
+	fs := flag.NewFlagSet("ssh gate", flag.ContinueOnError)
+	policy := fs.String("policy", "", "root-owned policy")
+	workspace := fs.String("workspace", "", "trusted workspace")
+	host := fs.String("host", "", "trusted host")
+	role := fs.String("role", "", "trusted role")
+	username := fs.String("user", "", "signed Unix account")
+	digest := fs.String("rules-digest", "", "signed allowlist version")
+	fixture := fs.Bool("dev-fixture", false, "isolated synthetic fixture ONLY")
+	if fs.Parse(args) != nil || fs.NArg() != 0 {
+		return sshcommand.Denied
+	}
+	return sshcommand.Run(*policy, *workspace, *host, *role, *username, *digest, os.Getenv("SSH_ORIGINAL_COMMAND"), *fixture)
+}
+
 func validLeaseID(id string) bool {
 	if len(id) != 32 {
 		return false
@@ -611,6 +631,10 @@ func sshHost(st *store.Store, args []string) error {
 		pre := fs.Bool("preapproved", false, "explicit matching-role preapproval")
 		pty := fs.Bool("permit-pty", false, "explicit interactive role")
 		explicit := fs.Bool("explicit-approval", true, "explicit risk approval")
+		legacy := fs.Bool("legacy-auth-only", false, "explicit development-only authentication fixture")
+		gateBinary := fs.String("gate-binary", "/usr/local/bin/21pins", "root-owned target gate binary")
+		gatePolicy := fs.String("gate-policy", "/etc/ssh/21pins/commands.json", "root-owned target allowlist")
+		allowlist := fs.String("command-allowlist", "", "private JSON fixed command/exec rule array")
 		if fs.Parse(args[2:]) != nil {
 			return errors.New("invalid host policy")
 		}
@@ -623,6 +647,31 @@ func sshHost(st *store.Store, args []string) error {
 			*explicit = false
 		}
 		r := sshaccess.Role{SSHUser: *user, DefaultLease: *def, MaxLease: *maximum, MaxCertTTL: *cert, Requesters: map[string]string{*requester: mode}, ExplicitApproval: *explicit, PermitPTY: *pty}
+		if *legacy {
+			if svc.Config.CA.Mode != "dev" {
+				return errors.New("legacy authentication only for explicit development fixtures")
+			}
+		} else {
+			rules := []sshcommand.Rule{{Command: []string{"status"}, Exec: []string{"/usr/bin/uptime"}}, {Command: []string{"platform"}, Exec: []string{"/usr/bin/uname", "-s"}}, {Command: []string{"identity"}, Exec: []string{"/usr/bin/id", "-u"}}}
+			if *allowlist != "" {
+				b, err := sshaccess.ReadPrivate(*allowlist)
+				if err != nil {
+					return err
+				}
+				d := json.NewDecoder(strings.NewReader(string(b)))
+				d.DisallowUnknownFields()
+				if d.Decode(&rules) != nil {
+					return errors.New("invalid command allowlist")
+				}
+				var extra any
+				if d.Decode(&extra) != io.EOF {
+					return errors.New("extra command policy")
+				}
+			} else if *role != "observe" {
+				return errors.New("non-observe role requires explicit command allowlist")
+			}
+			r.CommandAuthority = &sshcommand.Authority{Binary: *gateBinary, PolicyFile: *gatePolicy, Rules: rules}
+		}
 		svc.Config.Hosts[args[1]] = sshaccess.Host{Alias: *alias, Roles: map[string]sshaccess.Role{*role: r}}
 		if _, e = sshaccess.New(svc.Dir, svc.Config, svc.Signer); e != nil {
 			return e

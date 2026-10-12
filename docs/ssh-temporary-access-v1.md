@@ -38,7 +38,7 @@ Owner/admin registers a logical host/role without contacting the host:
   --default-lease 4h --max-lease 8h
 ```
 
-Default is explicit approval. `--preapproved` is an owner opt-in for the exact requester/host/role. Root requires explicit approval. `--permit-pty` is a separate interactive-role opt-in. Additional policies are edited in the private configuration after owner review; policy changes invalidate renewal of existing leases.
+Default is explicit approval. `--preapproved` opts in only the exact requester/host/role. New observe registrations are command-gated and permit only `status`, `platform`, `identity` with fixed argv. Gated roles disallow root, PTY and forwarding; different roles require different Unix users. Other roles require an explicit reviewed `--command-allowlist` JSON rule-array file. Policy changes invalidate renewal and signed rule digests prevent silent target-side broadening. See [command boundary](ssh-command-authority.md).
 
 Start the existing issuer gateway with `21pins serve --ssh-dir <private-ssh-config-dir>`. Requester CLI commands use its loopback API (`PINS21_SSH_API_URL`, default `http://127.0.0.1:8787`); they never open issuer/provider state, load a CA reference, or sign locally. Only CA initialization and host-policy/bootstrap commands are local owner operations on the issuer.
 
@@ -49,7 +49,7 @@ Open and review:
   --purpose "verify synthetic development service" --estimate 45m
 21pins ssh status <lease-id>
 21pins ssh approve <lease-id>
-21pins ssh exec <lease-id> -- printf '%s\n' synthetic
+21pins ssh exec <lease-id> -- platform
 21pins ssh complete <lease-id>
 ```
 
@@ -73,19 +73,28 @@ Example role policy (durations are configurable, not architectural constants):
   "permit_pty": false,
   "permit_port_forwarding": false,
   "permit_agent_forwarding": false,
-  "permit_x11": false
+  "permit_x11": false,
+  "command_authority": {
+    "binary": "/usr/local/bin/21pins",
+    "policy_file": "/etc/ssh/21pins/commands.json",
+    "allow": [
+      {"command": ["status"], "exec": ["/usr/bin/uptime"]},
+      {"command": ["platform"], "exec": ["/usr/bin/uname", "-s"]},
+      {"command": ["identity"], "exec": ["/usr/bin/id", "-u"]}
+    ]
+  }
 }
 ```
 
-Use `explicit_approval: true` for higher-privilege roles. Preapproval cannot bypass that requirement. Never infer privilege from successful SSH: dedicated OS accounts, sudoers and filesystem/network permissions remain host policy. Native signer extensions are deny-by-default (`-O clear`); user rc is never granted. The shipped CLI stays stricter: it does not provide forwarding flags, even if a manually configured role certificate permits them.
+Use `explicit_approval: true` for higher-privilege roles. Preapproval cannot bypass it. Dedicated accounts, exact root-owned helpers/sudo rules and filesystem/network policy remain host responsibilities; the gate never grants root shell. Native options start denied (`-O clear`), then only the exact role gate critical option is added. Gated roles have no PTY/forwarding extensions or user rc. Privileged fixed-peer operations are [future design only](ssh-dns-admin-design.md).
 
-### What `observe` authorizes (not command-level RBAC)
+### Authentication versus command enforcement
 
-An `observe` principal is a login/OS-account/SSH-feature scope, **not a read-only executable whitelist**. A valid `21pins:local:finland-staging-221:observe` certificate mapped to `pins-agent`, once approved trust and an eligible ordinary account shell exist, permits arbitrary noninteractive commands as that Unix account. The account can read/write/delete whatever its OS permissions allow; no-sudo is not equivalent to read-only access.
+The original authentication-only observe policy permitted arbitrary Unix-account commands; **it is superseded for production/dogfood**. Native principals alone, no-sudo, no PTY and disabled forwarding still do not enforce executable policy.
 
-The signer uses `-O clear` and adds only explicit role feature extensions. With the proposed default observe flags all false, a native certificate has **critical options: none; extensions: none**. There is no certificate `force-command`, server-side ForceCommand in the reviewed block, restricted wrapper, command allowlist or command-content/purpose inspection. The verifier presently rejects any nonempty critical-options list. Purpose is immutable control-plane approval/audit/renewal metadata, not a target-enforced command restriction. CLI shell quoting prevents argument interpolation bugs; it does not prohibit `sh -c` or other arbitrary executables.
+Current gated observe signs an exact critical force-command (extensions none), emits matching principal `command=...,restrict` plus account ForceCommand, and executes only a root-owned exact operation allowlist through the installed target gate. The verifier accepts only the expected exact critical-option encoding. Gate scope binds workspace/host/role/Unix user/rules digest, not hostile requested commands; direct shell/subsystem/unknown/altered-argument requests fail closed. Purpose remains immutable approval/audit/renewal metadata, not command-content interpretation.
 
-The isolated fixture's ForceCommand is solely test containment and is not deployed by bootstrap. Require an additional reviewed server wrapper/ForceCommand plus OS isolation if command-level or strictly read-only authority is desired; that is a different, unimplemented security policy and must not be implied by the word `observe`.
+Target shell/startup environment, root-owned artifacts and effective native configuration are mandatory pre-install checks. Allowed fixed executables are reviewed trusted code, not a universal process sandbox. Production agent CA configuration without command authority is rejected. Legacy authentication-only signer fixtures remain explicit development tests (`--legacy-auth-only` for old CLI fixture), never production observe. See [command authority and tests](ssh-command-authority.md).
 
 Host principals: `21pins:<workspace-id>:<host-id>:<role-id>`. Each host/Unix user accepts only its own configured principals. Never reuse a logical host ID for a different physical host. A different host with the same workspace CA rejects the certificate unless its administrator has incorrectly installed that other host's principal.
 

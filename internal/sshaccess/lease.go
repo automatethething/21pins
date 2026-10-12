@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/petrichor/21pins-cli/internal/sshcommand"
 	"io"
 	"os"
 	"path/filepath"
@@ -40,17 +41,18 @@ type Actor struct {
 	CanApprove bool
 }
 type Role struct {
-	SSHUser               string            `json:"ssh_user"`
-	DefaultLease          string            `json:"default_lease"`
-	MaxLease              string            `json:"max_lease"`
-	MaxCertTTL            string            `json:"max_cert_ttl"`
-	Requesters            map[string]string `json:"requesters"` // exact app names: approval or preapproved
-	RequesterMaxLease     map[string]string `json:"requester_max_lease,omitempty"`
-	ExplicitApproval      bool              `json:"explicit_approval"`
-	PermitPTY             bool              `json:"permit_pty"`
-	PermitPortForwarding  bool              `json:"permit_port_forwarding"`
-	PermitAgentForwarding bool              `json:"permit_agent_forwarding"`
-	PermitX11             bool              `json:"permit_x11"`
+	SSHUser               string                `json:"ssh_user"`
+	DefaultLease          string                `json:"default_lease"`
+	MaxLease              string                `json:"max_lease"`
+	MaxCertTTL            string                `json:"max_cert_ttl"`
+	Requesters            map[string]string     `json:"requesters"` // exact app names: approval or preapproved
+	RequesterMaxLease     map[string]string     `json:"requester_max_lease,omitempty"`
+	ExplicitApproval      bool                  `json:"explicit_approval"`
+	PermitPTY             bool                  `json:"permit_pty"`
+	PermitPortForwarding  bool                  `json:"permit_port_forwarding"`
+	PermitAgentForwarding bool                  `json:"permit_agent_forwarding"`
+	PermitX11             bool                  `json:"permit_x11"`
+	CommandAuthority      *sshcommand.Authority `json:"command_authority,omitempty"`
 }
 type Host struct {
 	Alias string          `json:"ssh_alias"`
@@ -126,6 +128,7 @@ type SignRequest struct {
 	Principal                                                         string
 	KeyID                                                             string
 	ValidAfter, ValidBefore                                           time.Time
+	ForceCommand                                                      string
 	PermitPTY, PermitPortForwarding, PermitAgentForwarding, PermitX11 bool
 }
 type Signer interface {
@@ -216,7 +219,24 @@ func validateConfig(c Config) error {
 		if !identifier.MatchString(h) || !identifier.MatchString(v.Alias) {
 			return errors.New("logical host/alias required")
 		}
+		users := map[string]bool{}
+		gatePolicy := ""
+		gateBinary := ""
 		for name, r := range v.Roles {
+			if c.CA.Mode == "agent" && r.CommandAuthority == nil {
+				return errors.New("production role requires command authority")
+			}
+			if r.CommandAuthority != nil {
+				if gatePolicy != "" && (gatePolicy != r.CommandAuthority.PolicyFile || gateBinary != r.CommandAuthority.Binary) {
+					return errors.New("one host command policy and gate binary required")
+				}
+				gatePolicy = r.CommandAuthority.PolicyFile
+				gateBinary = r.CommandAuthority.Binary
+				if r.CommandAuthority.Validate() != nil || r.SSHUser == "root" || users[r.SSHUser] || r.PermitPTY || r.PermitPortForwarding || r.PermitAgentForwarding || r.PermitX11 || (r.CommandAuthority.Fixture && c.CA.Mode != "dev") {
+					return errors.New("invalid gated role")
+				}
+				users[r.SSHUser] = true
+			}
 			if !identifier.MatchString(name) || !identifier.MatchString(r.SSHUser) {
 				return errors.New("invalid role/login")
 			}
@@ -524,7 +544,14 @@ func (s *Service) Issue(a Actor, id, pub string) (IssueResult, error) {
 		if s.Signer == nil {
 			return errors.New("SSH signer unavailable")
 		}
-		cert, e := s.Signer.Sign(SignRequest{PublicKey: pub, LeaseID: id, Serial: serial, Principal: l.Principal, KeyID: "21pins:" + id + ":" + l.AgentClass + ":" + l.ObjectiveID, ValidAfter: now.Add(-skew), ValidBefore: before, PermitPTY: r.PermitPTY, PermitPortForwarding: r.PermitPortForwarding, PermitAgentForwarding: r.PermitAgentForwarding, PermitX11: r.PermitX11})
+		force := ""
+		if r.CommandAuthority != nil {
+			force, e = r.CommandAuthority.ForcedCommand(l.Workspace, l.HostID, l.RoleID, l.SSHUser)
+			if e != nil {
+				return ErrDenied
+			}
+		}
+		cert, e := s.Signer.Sign(SignRequest{PublicKey: pub, LeaseID: id, Serial: serial, Principal: l.Principal, KeyID: "21pins:" + id + ":" + l.AgentClass + ":" + l.ObjectiveID, ValidAfter: now.Add(-skew), ValidBefore: before, PermitPTY: r.PermitPTY, PermitPortForwarding: r.PermitPortForwarding, PermitAgentForwarding: r.PermitAgentForwarding, PermitX11: r.PermitX11, ForceCommand: force})
 		if e != nil {
 			return errors.New("SSH certificate signing failed")
 		}
