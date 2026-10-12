@@ -51,6 +51,14 @@ Use provider names for credentials and routing namespaces; do not invent provide
 
 This distinction is intentional: future agents should say “Anthropic/Claude” or “OpenAI/Codex” when describing ownership, while preserving the canonical 21pins provider IDs (`anthropic` and `openai`).
 
+## Temporary SSH access (opt-in V1)
+
+Give an AI agent temporary SSH access without permanent agent credentials. An objective work lease can last hours; native OpenSSH user certificates last minutes and renew on demand for the same immutable scope/key. SSH traffic goes directly to the target—no proxy, host daemon or session recording.
+
+[SSH guide](docs/ssh-temporary-access-v1.md) · [Threat model](docs/ssh-threat-model.md) · [Host bootstrap/dogfood plan](docs/ssh-host-bootstrap.md) · [Harness/Pi integration](docs/ssh-harness-integration.md).
+
+Completion/revocation prevents new signing and cleans the owning client's key cache. **Already-issued certificates may reconnect until expiry; established sessions and detached work can survive expiry.** One-time production CA trust installation remains owner-approved. No production target is bootstrapped by the build/test suite.
+
 ## Prerequisites 
 
 ```bash

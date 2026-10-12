@@ -25,6 +25,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// SSH requester operations are API clients: never load issuer/provider state.
+	if os.Args[1] == "ssh" && len(os.Args) > 2 && os.Args[2] != "ca" && os.Args[2] != "host" {
+		handleSSH(nil, os.Args[2:])
+		return
+	}
+
 	st, err := store.New(config.StatePath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening store: %v\n", err)
@@ -32,6 +38,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "ssh":
+		handleSSH(st, os.Args[2:])
 	case "init":
 		fmt.Printf("21pins initialized at %s\n", config.StatePath())
 	case "key":
@@ -97,7 +105,15 @@ Commands:
   models choose [--provider <provider>] [--search text] [--index N]
   hosted status [--json] [--hosted-url URL]
   hosted smoke [--json] [--hosted-url URL] [--key-id hosted-ed25519-v1] [--require-public-key]
-  serve [--host 127.0.0.1] [--port 8787]
+  ssh ca init --dev | --agent --public-key <file> --agent-socket <socket>
+  ssh host add <id> --role <role> --user <user> --requester <app> [--preapproved]
+  ssh host bootstrap <id> --out <private-review-dir> [--dry-run]
+  ssh open --host <id> --role <role> --objective <id> --purpose <purpose> [--estimate 45m]
+  ssh exec <lease> -- <command> [args...]
+  ssh connect <lease>
+  ssh status|approve|complete|cancel|revoke <lease>
+  ssh objective complete|cancel <objective>
+  serve [--host 127.0.0.1] [--port 8787] [--ssh-dir <private-config-dir>]
 `)
 }
 
@@ -628,13 +644,13 @@ func handleEvaluate(st *store.Store, args []string) {
 	}
 
 	out := map[string]any{
-		"decision":    result.Decision,
-		"pin_states":  result.PinStates,
-		"reasons":     result.Reasons,
-		"receipt_id":  receipt.ID,
-		"approval_id": createdApprovalID,
+		"decision":     result.Decision,
+		"pin_states":   result.PinStates,
+		"reasons":      result.Reasons,
+		"receipt_id":   receipt.ID,
+		"approval_id":  createdApprovalID,
 		"approval_ref": receipt.ApprovalRef,
-		"signature":   receipt.Signature,
+		"signature":    receipt.Signature,
 	}
 	if *jsonOut {
 		printJSON(out)
@@ -770,9 +786,10 @@ func handleServe(st *store.Store, args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	host := fs.String("host", "127.0.0.1", "gateway bind host (use 0.0.0.0 for LAN)")
 	port := fs.Int("port", 8787, "gateway port")
+	sshConfig := fs.String("ssh-dir", "", "opt-in private SSH configuration directory")
 	_ = fs.Parse(args)
 
-	srv := gateway.NewServer(st, gateway.Config{Host: *host, Port: *port})
+	srv := gateway.NewServer(st, gateway.Config{Host: *host, Port: *port, SSHDir: *sshConfig})
 	fmt.Printf("21pins gateway listening on http://%s:%d\n", *host, *port)
 	fmt.Println("Use Authorization: Bearer <21pins-token>")
 	if err := srv.ListenAndServe(); err != nil {

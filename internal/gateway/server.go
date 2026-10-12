@@ -20,6 +20,7 @@ import (
 )
 
 type Config struct {
+	SSHDir            string
 	Host              string
 	Port              int
 	OpenAIBaseURL     string
@@ -75,6 +76,8 @@ func NewServer(st *store.Store, cfg Config) *Server {
 	mux.HandleFunc("/v1/providers/", s.withCORS(s.withAuth("proxy:providers", s.handleProviderPassthrough)))
 	mux.HandleFunc("/v1/usage", s.handleUsage)
 	mux.HandleFunc("/ui", s.handleUsageUI)
+	mux.HandleFunc("/v1/ssh/leases", s.handleSSH)
+	mux.HandleFunc("/v1/ssh/leases/", s.handleSSH)
 	mux.HandleFunc("/", s.handleRoot)
 	s.handler = s.withCORSHandler(mux)
 	return s
@@ -119,7 +122,7 @@ func (s *Server) withCORS(next http.HandlerFunc) http.HandlerFunc {
 
 func (s *Server) withCORSHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !isUsageSurface(r.URL.Path) {
+		if !isUsageSurface(r.URL.Path) && !strings.HasPrefix(r.URL.Path, "/v1/ssh/") {
 			setCORSHeaders(w)
 		}
 		next.ServeHTTP(w, r)

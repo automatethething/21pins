@@ -1,6 +1,6 @@
 # 21pins temporary SSH — integration-first v1
 
-Status: specification for founder review; not implemented or authorized for deployment.
+Status: SUPERSEDED by the owner's explicit OpenSSH certificate + renewable work-lease build objective. The Teleport-only proposal below is retained as historical design discussion, not current requirements. Current V1: `docs/ssh-temporary-access-v1.md`, `docs/ssh-threat-model.md`, `docs/ssh-host-bootstrap.md`, and `docs/ssh-harness-integration.md`. No production trust installation is authorized.
 
 ## Goal and decision
 
