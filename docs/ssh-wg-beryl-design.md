@@ -1,4 +1,6 @@
-# VM205 Beryl-only WireGuard authority — review, NOT installed
+# VM205 Beryl-only WireGuard authority — approved and installed
+
+**2026-10-13 update:** owner `y` approved this exact boundary; restricted trust/recovery/native certificate smoke is installed and verified. Historical review/preflight sections below preserve approval provenance, not a request to reinstall. See `ssh-vm205-beryl-dogfood.md`. Beryl is explicitly human-controlled; owner-run client/guest tests and fresh correlated evidence remain outstanding. Never reinstall this account/trust/backup.
 
 ## Bounded objective
 
