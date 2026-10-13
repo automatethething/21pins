@@ -24,6 +24,12 @@ class GuestChecks(unittest.TestCase):
   client['boundary_witness']=witness;client['intended_boundary_rejection_verified']=True
   self.assertFalse(m.classify(client,obs,dict(obs),10,30,trusted_dns_baseline_verified=True)['guest_isolation_verified'])
   self.assertFalse(m.classify(client,obs,dict(obs),10,30,trusted_dns_baseline_verified=True,boundary_witness=True)['guest_isolation_verified'])
+  policy={'kind':'active_source_scoped_routing','rule_identity':'fixture-LAN-only-policy'}
+  for key in ['independently_validated','applicable_policy_verified','guest_to_protected_DNS_path','UDP_TCP_scope_verified','active_policy','trusted_source_only','guest_equivalent_policy_absent','guest_leak_blackhole_enabled','protected_destination_binding_verified','marked_table_uses_private_tunnel','killswitch_enabled']:policy[key]=True
+  self.assertTrue(m.classify(client,obs,dict(obs),10,30,trusted_dns_baseline_verified=True,boundary_witness=policy)['guest_isolation_verified'])
+  for key in ['active_policy','protected_destination_binding_verified','guest_equivalent_policy_absent','guest_leak_blackhole_enabled']:
+   broken=dict(policy);broken[key]=False
+   self.assertFalse(m.classify(client,obs,dict(obs),10,30,trusted_dns_baseline_verified=True,boundary_witness=broken)['guest_isolation_verified'])
   witness['test_specific_match']=False
   self.assertFalse(m.classify(client,obs,dict(obs),10,30,trusted_dns_baseline_verified=True,boundary_witness=witness)['guest_isolation_verified'])
   self.assertFalse(m.classify(client,obs,dict(obs),10,30)['guest_isolation_verified'])

@@ -21,7 +21,13 @@ def classify(client,gateway,resolver,before,after,*,trusted_dns_baseline_verifie
   default=client['default_synthetic_query']
   r['public_not_protected_DNS_behavior_verified']=r['public_controls_pass'] and client.get('private_resolver_advertised_as_DNS_or_failover') is False and default['transport_completed'] and default['status']=='NXDOMAIN' and r['no_observed_protected_path_nonce']
   w=boundary_witness if isinstance(boundary_witness,dict) else {}
-  r['intended_boundary_rejection_verified']=all(w.get(k) is True for k in ['independently_validated','guest_to_protected_DNS_path','test_specific_match','UDP_TCP_scope_verified','applicable_policy_verified']) and w.get('action') in ['drop','reject','prohibit'] and isinstance(w.get('rule_identity'),str) and bool(w['rule_identity'].strip())
+  validated=all(w.get(k) is True for k in ['independently_validated','guest_to_protected_DNS_path','UDP_TCP_scope_verified','applicable_policy_verified']) and isinstance(w.get('rule_identity'),str) and bool(w['rule_identity'].strip())
+  if w.get('kind')=='active_source_scoped_routing':
+   r['intended_boundary_rejection_verified']=validated and all(w.get(k) is True for k in ['active_policy','trusted_source_only','guest_equivalent_policy_absent','guest_leak_blackhole_enabled','protected_destination_binding_verified','marked_table_uses_private_tunnel','killswitch_enabled'])
+   r['boundary_evidence_basis']='active_source_scoped_policy_plus_synchronized_behavior'
+  else:
+   r['intended_boundary_rejection_verified']=validated and w.get('test_specific_match') is True and w.get('action') in ['drop','reject','prohibit']
+   r['boundary_evidence_basis']='test_linked_rule_rejection_witness' if w else 'missing'
   required=['public_controls_pass','public_not_protected_DNS_behavior_verified','trusted_DNS_baseline_verified','private_DNS_no_completed_transport','no_observed_protected_path_nonce','observation_brackets_guest_test','intended_boundary_rejection_verified']
   r['guest_isolation_verified']=all(r[k] for k in required)
   if total or not r['private_DNS_no_completed_transport']:r['reason']='private_DNS_or_protected_path_access_observed'

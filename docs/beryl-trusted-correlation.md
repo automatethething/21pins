@@ -1,4 +1,4 @@
-# Trusted-network E2E VERIFIED — guest isolation not verified
+# Trusted-network E2E VERIFIED — guest isolation separately VERIFIED
 
 ## Accepted synchronized owner-run evidence (2026-10-13)
 
@@ -12,7 +12,7 @@ Owner supplied the real combined result from the prepared workflow. No client pr
 
 **Trusted-network E2E: VERIFIED**, within the documented private-source/pinned-peer operational-correlation limits. The client-only `E2E_complete=false` is intentional: the client alone cannot establish server proof; the combined result does. This is NOT full Beryl/guest completion or physical-client cryptographic attestation.
 
-**Guest isolation: NOT VERIFIED**, separate and not authorized by this one-use exception. No further capture, guest probe, replay or host/network/trust change is authorized. Historical unsuccessful windows below remain preserved, not silently reclassified.
+**Guest isolation: separately VERIFIED** using the later synchronized guest test and additional owner-supplied active source-scoped Beryl routing/leak-guard evidence; see `beryl-guest-verification.md`. This did not reuse the trusted one-use exception, rerun the trusted test, alter configurations or extend installed roles. No further capture/probe/replay is required or authorized by these completed tests. Historical unsuccessful windows below remain preserved, not silently reclassified.
 
 Workflow/procedure: `beryl-synchronized-proof.md`. No additional client run is needed for this trusted checkpoint.
 
