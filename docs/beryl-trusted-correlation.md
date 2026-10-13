@@ -1,5 +1,19 @@
 # Trusted-client evidence: historical correlation not verified
 
+## Single authorized follow-up attempt — closed, exception expired
+
+The owner authorized exactly one read-only nonce-only server window through existing management. Pi did NOT execute/simulate the client or change host/network/trust configuration. Before launch, the private readiness marker was absent; kernel-filter readiness was positively verified at `2026-10-13T13:13:20.211060Z`. The bounded95s observer closed cleanly with zero source-bound synthetic queries. The post-observer pinned-peer snapshot was at `2026-10-13T13:14:56.937619Z`; owned PID22028 has exited. The exception was consumed and is now expired; no subsequent management observation is authorized.
+
+Owner subsequently supplied trusted-client nonce `pins-d55b10aec842f2d0.invalid`, window `2026-10-13T13:16:48.627616Z`–`13:16:51.008422Z`. Its reported start is111.69s AFTER the completed post-observer snapshot. Therefore no overlap or exact nonce/query correlation exists. Clock mismatch is also not ruled out; zero captured challenge still supplies no positive correlation. Do not interpret the empty window as DNS failure.
+
+Pinned-peer traffic advanced during the EARLIER server window (RX+4780 bytes, TX+7236 bytes; latest handshake1791897147→1791897269). These earlier deltas cannot be attributed to the later client nonce/window. They are NOT trusted-client E2E proof.
+
+Client public DNS/HTTPS and private allowed UDP/TCP controls succeeded; private blocked/challenge UDP/TCP returned NXDOMAIN. All supplied explicit_block_or_filter_EDE fields are false. This does not prove filtering failed, but NXDOMAIN alone does not prove policy-generated blocking. No contemporaneous resolver policy record was collected/exposed.
+
+Trusted E2E remains UNVERIFIED; guest isolation remains unverified and unauthorized. No second window or status polling was started. Temporary local collector/result material is retired after recording these minimized facts.
+
+A further attempt requires a NEW one-use exception, not reuse of the consumed grant. To avoid another expired RUN NOW window, prepare an owner-started synchronized terminal workflow that starts the server witness and waits for readiness immediately before the OWNER executes the client command. Pi must never run/simulate that client. Ensure the next witness can report the actual filtering decision (explicit EDE or a source/test/time-filtered resolver policy event), not only challenge arrival. Resolve those capabilities before asking the owner to repeat the client test.
+
 ## Owner-supplied successful client observations
 
 Trusted client window: `2026-10-13T12:50:22.599628Z` through `2026-10-13T12:50:24.933306Z` (epoch1791895822.599628–1791895824.933306).
