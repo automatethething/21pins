@@ -10,6 +10,7 @@ def filters(src,dst,proto,expected=None):
  def add(code,k=0):p.append([code,0,0,k])
  def equal(k):guards.append(len(p));add(0x15,k)
  add(0x20,12);equal(int(ipaddress.ip_address(src)));add(0x20,16);equal(int(ipaddress.ip_address(dst)))
+ add(0x30,9);equal(proto)
  add(0xb1,0);add(0x48,2);equal(53)
  if proto==17:offset=21
  else:
@@ -37,10 +38,15 @@ def challenge(packet,proto):
  except (IndexError,ValueError,UnicodeError,AssertionError):return None
 
 def main():
- m=json.loads(pathlib.Path('/etc/21pins/dns-admin.json').read_text());dst=m['resolver'];src=sys.argv[1];assert ipaddress.ip_address(src).is_private
- assert m['technitium_unit']=='dns.service'
- service=subprocess.run(['/usr/bin/systemctl','is-active','dns.service'],capture_output=True,text=True,timeout=3)
- assert service.returncode==0 and service.stdout.strip()=='active'
+ gateway_mode=sys.argv[4:5]==['--gateway'];src=sys.argv[1];assert ipaddress.ip_address(src).is_private
+ if gateway_mode:
+  m=json.loads(pathlib.Path('/etc/21pins/wg-beryl.json').read_text());assert m['interface']=='wg0' and src==m['allowed_ip'].split('/')[0]
+  assert pathlib.Path('/sys/class/net/wg0/type').read_text().strip()=='65534' # ARPHRD_NONE: no link/MAC header.
+  dst=sys.argv[5];assert ipaddress.ip_address(dst).is_private
+ else:
+  m=json.loads(pathlib.Path('/etc/21pins/dns-admin.json').read_text());dst=m['resolver'];assert m['technitium_unit']=='dns.service'
+  service=subprocess.run(['/usr/bin/systemctl','is-active','dns.service'],capture_output=True,text=True,timeout=3)
+  assert service.returncode==0 and service.stdout.strip()=='active'
  seconds=int(sys.argv[2]) if len(sys.argv)>2 else 95;assert 1<=seconds<=100
  expected=sys.argv[3] if len(sys.argv)>3 else None
  if expected:assert re.fullmatch(r'pins-[0-9a-f]{16}\.invalid',expected)
@@ -49,7 +55,12 @@ def main():
  class Program(ctypes.Structure):_fields_=[('len',ctypes.c_ushort),('filter',ctypes.POINTER(Filter))]
  sockets=[];arrays=[]
  for proto in [17,6]:
-  s=socket.socket(socket.AF_INET,socket.SOCK_RAW,proto);s.bind((dst,0));p=filters(src,dst,proto,expected);a=(Filter*len(p))(*(Filter(*i) for i in p));arrays.append(a);f=Program(len(p),a);s.setsockopt(socket.SOL_SOCKET,26,bytes(f));s.setblocking(False)
+  # Cooked packets contain IP only, never Ethernet/MAC or sockaddr link metadata.
+  if gateway_mode:s=socket.socket(socket.AF_PACKET,socket.SOCK_DGRAM,0)
+  else:s=socket.socket(socket.AF_INET,socket.SOCK_RAW,proto);s.bind((dst,0))
+  p=filters(src,dst,proto,expected);a=(Filter*len(p))(*(Filter(*i) for i in p));arrays.append(a);f=Program(len(p),a);s.setsockopt(socket.SOL_SOCKET,26,bytes(f))
+  if gateway_mode:s.bind((m['interface'],0x0800))
+  s.setblocking(False)
   # Discard any pre-filter queued datagrams without copying payload or identifiers.
   libc=ctypes.CDLL(None,use_errno=True);libc.recv.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int];libc.recv.restype=ctypes.c_ssize_t
   for _ in range(128):
@@ -59,6 +70,7 @@ def main():
     raise RuntimeError('queue purge failed closed')
   else:raise RuntimeError('queue purge bound exceeded')
   sockets.append((s,proto))
+ started=time.time()
  ready=pathlib.Path('/tmp/21pins-beryl-observer-ready');fd=os.open(str(ready),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.write(fd,(expected or 'kernel-filter-active').encode());os.close(fd)
  print(json.dumps({'synthetic_only_kernel_filter_active':True,'window_seconds':seconds,'no_MAC_public_IP_or_nonchallenge_query_collection':True}),flush=True)
  end=time.monotonic()+seconds;counts={};epochs={}
@@ -71,10 +83,11 @@ def main():
     if name and (not expected or name==expected):
      row=counts.setdefault(name,{'UDP':0,'TCP':0});row['UDP' if proto==17 else 'TCP']+=1;epochs.setdefault(name,[]).append(time.time())
  finally:
+  ended=time.time()
   for s,_ in sockets:s.close()
   ready.unlink(missing_ok=True)
   if expected and stop.is_file() and not stop.is_symlink() and stop.stat().st_uid==0 and stop.read_bytes()==expected.encode():stop.unlink()
- print(json.dumps({'source_bound_synthetic_queries':counts,'query_UTC_epochs':epochs,'observer_closed':True,'technitium_active':True,'not_guest_or_handshake_proof_alone':True}),flush=True)
+ print(json.dumps({'source_bound_synthetic_queries':counts,'query_UTC_epochs':epochs,'observer_closed':True,'technitium_active':not gateway_mode,'gateway_interface_observed':gateway_mode,'observation_start_UTC_epoch':started,'observation_end_UTC_epoch':ended,'not_guest_or_handshake_proof_alone':True}),flush=True)
 def self_test():
  # RFC5737 documentation fixtures, never live endpoints or owner identifiers.
  src=str(ipaddress.IPv4Address(0xc000020a));dst=str(ipaddress.IPv4Address(0xc0000235));name='pins-0123456789abcdef.invalid';q=b'\x15pins-0123456789abcdef\x07invalid\x00\x00\x01\x00\x01';dns=b'\x00'*12+q
@@ -87,8 +100,8 @@ def self_test():
   a=x=pc=0
   while pc<len(program):
    code,jt,jf,k=program[pc]
-   if code in [0x20,0x40,0x48,0x50]:
-    off=k+(x if code!=0x20 else 0);n={0x20:4,0x40:4,0x48:2,0x50:1}[code]
+   if code in [0x20,0x30,0x40,0x48,0x50]:
+    off=k+(x if code not in [0x20,0x30] else 0);n={0x20:4,0x30:1,0x40:4,0x48:2,0x50:1}[code]
     if off+n>len(p):return False
     a=int.from_bytes(p[off:off+n],'big')
    elif code==0xb1:x=(p[k]&15)*4

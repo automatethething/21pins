@@ -2,9 +2,11 @@
 
 Trusted-network E2E remains VERIFIED. The owner authorized one separate read-only guest attempt, with no configuration/trust/policy changes and no trusted-client rerun. No guest observer or client test has been started; this new grant is unconsumed.
 
-## Blocking execution-mode requirement
+## Prepared owner-started execution
 
-The requested chat readiness signal followed by an observer remaining active until an arbitrary later owner test/stop conflicts with the mandatory120s ceiling for tool/workflow/background execution. Do not launch another expiring chat-dependent capture, an uncapped daemon, or silently re-arm windows. The safe alternative is the same **owner-started synchronized workflow** used successfully for trusted: prepare server witnesses, owner switches to guest and launches one command, command confirms actual readiness then immediately executes the OWNER's guest client test, classifies and cleans within the bounded attempt. Owner selection is required because the latest guest request explicitly specifies the incompatible chat-first indefinite lifetime.
+Owner replied “ok I'm connected to the guest network” after the synchronized guest-workflow proposal. The guest-only owner command is now prepared and offline-tested, NOT run by Pi. It uses the same no-chat-delay synchronization that worked for trusted: two server witnesses are armed first, actual matching kernel readiness confirmed, then the owner's client executes immediately. No idle indefinite collector or silent window rearming. Main95s+cleanup≤20s, each remote observer85s; all operations below120s.
+
+The diagnostic can detect private reachability/protected-path leakage. Without affirmative boundary-denial evidence and trusted-path admin-target baselines, **negative behavior remains NOT VERIFIED**, not a policy pass. Those missing capabilities are explicit in the final classifier; no configuration change or synthetic substitute manufactures them.
 
 ## Evidence criteria / preparation plan
 
@@ -21,4 +23,28 @@ Independent neutral reviews agree that public positives + private timeouts + des
 
 ## Human actions required
 
-In this Pi chat reply **`Use the owner-started synchronized guest workflow`** to select the bounded, no-chat-delay execution mode. Pi will then prepare the exact guest-only owner command and honest evidence gates; do NOT run the trusted wrapper or any guest probes yet. No credentials, raw logs, packet dumps, MACs or public IPs should be pasted. Expected next signal is a prepared command whose owner execution confirms actual readiness immediately before the guest client test, not a claim an idle observer is already running.
+Stay connected to Beryl's **guest** network. In your Mac Terminal run exactly once:
+
+```sh
+python3 /Users/claw/flowstate/repos/21pins/scripts/beryl-guest-synchronized-proof.py --owner-run
+```
+
+Do not run the trusted wrapper. This command uses the existing management identity/strict host pins, prepares exact-nonce witnesses on the gateway and resolver, checks clocks/readiness and prints **`observer ready / RUN GUEST TEST`** in Terminal immediately before automatically running your guest client test. Pi never launches it live. Both collectors stop/clean before the final JSON; the one-use grant is consumed even on failure. No automatic retry.
+
+Paste only the final JSON line including `classification` and `observer_cleanup_verified`. Never credentials, raw logs/packets, profiles, MACs or public IPs. If it fails or cleanup is unverified, send that JSON and do not rerun. Expected result either identifies private access/leakage or reports the specific evidence missing for full guest VERIFIED. The current classifier deliberately cannot claim full VERIFIED from silent drops alone.
+
+## Observer implementation and pure checks
+
+Gateway capture uses protocol0 AF_PACKET/SOCK_DGRAM, installs exact-nonce IPv4 kernel filters BEFORE binding only `wg0`/ETH_P_IP, and receives network-layer bytes with `recv()` (no Ethernet header or sockaddr MAC metadata). Fail closed unless sysfs interface type is ARPHRD_NONE65534. No promiscuous mode or policy changes. Resolver capture retains exact-nonce AF_INET filters; both record actual start/end epochs to require full overlap for negative observations. Nonce may expose guest default-DNS proxy traversal as well as direct private attempts.
+
+Two independent abstract reviewers accepted cooked/MAC-free tunnel capture and Python host-order bind protocol; existing dynamic IP/TCP offsets and Linux NULL-buffer purge already address framing/queue concerns. No broader tuple-only capture is used to recover segmented TCP queries.
+
+Offline checks only (no guest/trusted client or network simulation):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_beryl_guest.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_beryl_synchronized.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/beryl-query-observer.py --self-test
+```
+
+Trusted-network proof remains VERIFIED and is not rerun.
