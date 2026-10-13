@@ -6,8 +6,9 @@ import argparse,datetime,importlib.util,json,os,pathlib,secrets,signal,subproces
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('synchronized',ROOT/'scripts/beryl-synchronized-proof.py');common=importlib.util.module_from_spec(spec);spec.loader.exec_module(common)
 
-def classify(client,gateway,resolver,before,after):
- r={'guest_isolation_verified':False,'intended_boundary_rejection_verified':False,'protected_admin_trusted_baselines_available':False,'public_controls_pass':False,'private_DNS_no_completed_transport':False,'no_observed_protected_path_nonce':False,'protected_path_nonce_detected':False,'observation_brackets_guest_test':False,'reason':'incomplete_observation'}
+def classify(client,gateway,resolver,before,after,*,trusted_dns_baseline_verified=False,boundary_witness=None):
+ # Witness is an independently validated policy-audit result, NEVER raw client JSON.
+ r={'guest_isolation_verified':False,'intended_boundary_rejection_verified':False,'trusted_DNS_baseline_verified':trusted_dns_baseline_verified is True,'public_not_protected_DNS_behavior_verified':False,'public_controls_pass':False,'private_DNS_no_completed_transport':False,'no_observed_protected_path_nonce':False,'protected_path_nonce_detected':False,'observation_brackets_guest_test':False,'reason':'incomplete_observation'}
  try:
   nonce=client['synthetic_query_challenge'];start=datetime.datetime.fromisoformat(client['UTC_start']).timestamp();end=datetime.datetime.fromisoformat(client['UTC_end']).timestamp()
   r['observation_brackets_guest_test']=before<=start<=end<=after and all(o['observer_closed'] and o['observation_start_UTC_epoch']<=start<=end<=o['observation_end_UTC_epoch'] for o in [gateway,resolver])
@@ -16,13 +17,21 @@ def classify(client,gateway,resolver,before,after):
   total=sum(sum(o['source_bound_synthetic_queries'].get(nonce,{}).values()) for o in [gateway,resolver])
   r['protected_path_nonce_detected']=total>0;r['no_observed_protected_path_nonce']=total==0 and r['observation_brackets_guest_test']
   r['protected_DNS_endpoint_no_completed_transport']=r['private_DNS_no_completed_transport']
-  r['protected_admin_TCP_reachable']=any(x['reachable'] for x in client.get('private_admin_TCP',{}).values())
+  r['supplementary_private_admin_TCP_reachable']=any(x['reachable'] for x in client.get('private_admin_TCP',{}).values())
+  default=client['default_synthetic_query']
+  r['public_not_protected_DNS_behavior_verified']=r['public_controls_pass'] and client.get('private_resolver_advertised_as_DNS_or_failover') is False and default['transport_completed'] and default['status']=='NXDOMAIN' and r['no_observed_protected_path_nonce']
+  w=boundary_witness if isinstance(boundary_witness,dict) else {}
+  r['intended_boundary_rejection_verified']=all(w.get(k) is True for k in ['independently_validated','guest_to_protected_DNS_path','test_specific_match','UDP_TCP_scope_verified','applicable_policy_verified']) and w.get('action') in ['drop','reject','prohibit'] and isinstance(w.get('rule_identity'),str) and bool(w['rule_identity'].strip())
+  required=['public_controls_pass','public_not_protected_DNS_behavior_verified','trusted_DNS_baseline_verified','private_DNS_no_completed_transport','no_observed_protected_path_nonce','observation_brackets_guest_test','intended_boundary_rejection_verified']
+  r['guest_isolation_verified']=all(r[k] for k in required)
   if total or not r['private_DNS_no_completed_transport']:r['reason']='private_DNS_or_protected_path_access_observed'
-  elif r['protected_admin_TCP_reachable']:r['reason']='protected_private_admin_access_observed'
   elif not r['public_controls_pass']:r['reason']='public_positive_control_failed'
   elif not r['observation_brackets_guest_test']:r['reason']='server_observation_did_not_cover_guest_test'
-  else:r['reason']='boundary_rejection_and_admin_trusted_baselines_not_proven'
-  # ponytail: never turn silence into policy proof; no boundary witness is available here.
+  elif not r['public_not_protected_DNS_behavior_verified']:r['reason']='public_vs_protected_DNS_behavior_not_proven'
+  elif not r['trusted_DNS_baseline_verified']:r['reason']='known_positive_trusted_DNS_baseline_missing'
+  elif not r['intended_boundary_rejection_verified']:r['reason']='intended_boundary_rejection_not_proven'
+  else:r['reason']='required_guest_DNS_path_properties_verified'
+  # ponytail: admin probes are supplementary; absence is not a boundary witness.
  except (KeyError,TypeError,ValueError):pass
  return r
 
@@ -72,7 +81,7 @@ def main():
    if not observers[vm].get('observer_closed'):raise ValueError('cleanup unverified')
   if not observers[205].get('gateway_interface_observed') or not observers[220].get('technitium_active'):raise ValueError('path/service witness missing')
   stage='peer_post';after=common.guest(205,common.BASE)[0]
-  report={'client':client,'gateway_nonce_evidence':observers[205],'resolver_nonce_evidence':observers[220],'peer_rx_increase':after['pinned_peer_rx_bytes']-before['pinned_peer_rx_bytes'],'peer_tx_increase':after['pinned_peer_tx_bytes']-before['pinned_peer_tx_bytes'],'peer_handshake_before':before['pinned_peer_handshake_epoch'],'peer_handshake_after':after['pinned_peer_handshake_epoch'],'before_UTC_epoch':before['UTC_epoch'],'after_UTC_epoch':after['UTC_epoch'],'classification':classify(client,observers[205],observers[220],before['UTC_epoch'],after['UTC_epoch'])}
+  report={'client':client,'gateway_nonce_evidence':observers[205],'resolver_nonce_evidence':observers[220],'peer_rx_increase':after['pinned_peer_rx_bytes']-before['pinned_peer_rx_bytes'],'peer_tx_increase':after['pinned_peer_tx_bytes']-before['pinned_peer_tx_bytes'],'peer_handshake_before':before['pinned_peer_handshake_epoch'],'peer_handshake_after':after['pinned_peer_handshake_epoch'],'before_UTC_epoch':before['UTC_epoch'],'after_UTC_epoch':after['UTC_epoch'],'classification':classify(client,observers[205],observers[220],before['UTC_epoch'],after['UTC_epoch'],trusted_dns_baseline_verified=True)}
  except (Exception,KeyboardInterrupt):report={'guest_isolation_verified':False,'attempt_failed_closed':True,'failure_stage':stage,'client_started':client_started,'no_automatic_retry':True}
  finally:
   signal.alarm(0)

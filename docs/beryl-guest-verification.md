@@ -14,40 +14,42 @@ Established observations:
 - Client TCP connections to private DNS-host admin ports22/5380 did not succeed. Gateway RX+64/TX+0 and unchanged handshake are not a nonce-specific denial event; no keepalive or drop-cause inference.
 - Both observers/owned markers closed/cleaned, no automatic retry; trusted test not rerun. Redacted authorization-field value is not required or stored.
 
-Existing evidence DOES close the trusted **DNS** baseline: real trusted UDP/TCP allowed replies plus source-bound query/service/policy proof at14:19. It does NOT supply trusted direct-client TCP22/5380 positives. The native VM220 SSH certificate smoke uses the management bastion, not the Beryl trusted-client path; service existence or listening sockets would not supply that missing baseline either.
+Existing evidence closes the REQUIRED trusted **DNS/port53** baseline: real trusted UDP/TCP allowed replies plus source-bound query/service/policy proof at14:19. Specification review found no requirement that ordinary Beryl trusted clients can reach TCP22/5380. Those are supplementary negative probes, NOT verification gates; no trusted admin-port check is required. The earlier mandatory admin-baseline flag was an overconstraint and is removed.
 
 A narrow local report/record lookup found only the known private-DNS topology report, no Beryl/guest-specific policy report. Existing known local topology report contains server INPUT/FORWARD-drop/DNS-source-ACL evidence, but no guest nonce/window, UCI command or Beryl firewall-config export. It is not Beryl guest-edge policy/counter evidence. Known narrow owner transcripts contain the explicit no-Beryl-SSH/admin/probe restriction and no existing router-policy export. Installed21pins has no Beryl host; its WG role only enroll/inspect and DNS role fixed query/test/status/missing-proof literals cannot retrieve Beryl guest rules, routes or counters. No already-authorized Beryl policy-reading mechanism is evidenced. No router access or new management trust was attempted.
 
-Thus the two remaining gaps are NOT closed by available evidence:
+## Corrected acceptance and reclassification
 
-1. A deterministic intended-boundary witness tied to this test (matched guest→private/WG reject rule and test-correlated deny event/counter delta, or equivalent attributable rejection). A policy toggle/rule existing today or a cumulative counter without the test's before/after/flow association is not sufficient.
-2. Trusted direct-client TCP reachability for the relevant protected admin ports, or documented removal from scope because they are not actually trusted-reachable targets. DNS-port positives and bastion SSH success cannot be relabeled as admin positives.
+The required properties are: (1) public Internet works, (2) effective default DNS works without protected private DNS advertisement/use observed for the challenge, (3) verified trusted private DNS endpoint fails guest requests, (4) exact guest nonce absent at both protected observation points during full coverage, (5) rejection attributable to intended Beryl guest boundary.
 
-**No synchronized full rerun is justified yet.** First obtain already-existing historical boundary evidence if it is available through the owner's existing management UI. If it closes gap1, only a narrow owner-run trusted TCP22/5380 baseline is additional live evidence; no DNS E2E or guest rerun is needed. If no historical test-linked boundary record exists, one newly authorized, minimal guest rejection probe under observation of an EXISTING matched rule/counter is required; do not repeat the full suite or enable/change logging/policy merely to make it pass. If relevant admin ports are also blocked from trusted, choose genuinely trusted-reachable protected targets rather than manufacturing a positive baseline.
+Reprocessing the EXISTING owner record using the corrected classifier passes the observable gates for1–4. The ONLY remaining required failure is `intended_boundary_rejection_not_proven`. Default-DNS findings are scoped to recorded controls/challenge, not a claim all possible future queries/upstream resolvers were monitored. The wrapper never accepts a causal witness from raw client JSON: an independently validated policy-audit result is required. Tests verify that validated attribution permits VERIFIED WITHOUT admin positives, whereas silence, aggregate counter state, wrong/unattributed witnesses, private query leakage and missing trusted DNS proof cannot pass.
+
+Whether Beryl retains a historical deny/log event for14:54:03–14:54:09 is **UNKNOWN**, not established absent. Available local records do not contain it and there is no identified already-authorized router policy-reading channel for Pi. No Beryl SSH, management probe or new credential access was attempted. No full synchronized suite rerun or admin-port baseline is necessary merely to reevaluate these records.
+
+## Minimal conditional boundary verification proposal
+
+First use a preexisting, test-linked historical deny record if one exists: existing rule identity/action, correct guest source/destination/protocol direction and14:54 test association. A current toggle or cumulative counter alone does not close attribution.
+
+If that record does NOT exist, prepare ONE owner-started bounded attempt, no chat-dependent capture window:
+
+1. Read and identify the existing compiled guest→private/WireGuard reject/drop/prohibit rule and routing/zone context. Verify it actually matches the known-positive private DNS target/guest source and relevant transports; never invent a rule or change it.
+2. Pre-generate one fresh nonce and arm exact-nonce observers at gateway and resolver; verify actual readiness.
+3. Immediately read the selected existing rule counter BEFORE the probe. Do not reset counters or enable logs.
+4. Owner emits ONE nonce-bearing UDP DNS query to the already-known-positive private DNS endpoint. Record exact send/UTC/protocol/flow evidence, no raw unrelated data.
+5. Immediately read the SAME rule counter AFTER. Require an attributable expected delta for that probe—not merely a nonzero broad counter that could reflect other guest traffic—and verify source/path/destination/compiled rule matches. If counters are aggregate and attribution cannot be separated read-only, the result remains NOT VERIFIED.
+6. Confirm that nonce is absent beyond the boundary during the bracketed probe; stop/clean both observers and minimal temporary resources. Read-only policy identity must remain unchanged. No trusted E2E rerun, full guest suite, logging/rule/router/host change.
+
+Historical evidence must identify the applicable compiled rule/policy version and continuity for the completed test; a rule recompiled later cannot automatically attest earlier behavior. A new narrow confirmation records its own timestamp and unchanged-policy relationship to the retained guest observations, not a fabricated historical packet trace.
+
+A protocol-independent matching rejection rule allows one probe to establish the shared boundary. If UDP/TCP use distinct rules, do not claim a UDP counter validates the other rule: inspect an existing equivalent TCP witness or explicitly identify the additional minimal probe before running anything.
+
+If the historical witness or narrowly correlated counter attempt establishes property5, `guest_isolation_verified=true` is justified under the owner's five-property acceptance criterion. It is NOT VERIFIED until then.
 
 ## Current Human actions required
 
 Use your existing Beryl management interface in read-only/view mode, its guest→private/WireGuard firewall/routing policy and existing deny/audit history, to determine whether it retains a matched reject/route decision for the14:54:03–14:54:09 test. Share ONLY minimized rule identity, guest/private direction, action, timestamp and a test-specific match/count (not raw logs, credentials, addresses, MACs or unrelated traffic). If you want Pi to perform that inspection, explicitly identify and authorize the bounded read-only mechanism; no Beryl login/probe channel is currently authorized for Pi.
 
-Do NOT run either synchronized wrapper again. Reply here whether a historical matched-rule witness is available and whether ports22/5380 are intended trusted-reachable admin targets. If those are intended trusted-reachable targets, the smallest additional live baseline is the following OWNER-only check while connected to Beryl's **trusted** network (no DNS test, login or guest rerun):
-
-```sh
-python3 - <<'PY'
-import json,pathlib,socket
-m=json.loads(pathlib.Path('/Users/claw/flowstate/repos/21pins/docs/ssh-technitium-manifest.json').read_text())
-out={'owner_attested_client_network':'trusted','protected_admin_TCP':{}}
-for port in (22,5380):
- try:
-  with socket.create_connection((m['resolver'],port),timeout=2):ok=True
- except OSError:ok=False
- out['protected_admin_TCP'][str(port)]={'reachable':ok}
-print(json.dumps(out))
-PY
-```
-
-This is a TCP reachability observation only, not application login/health or a repeat of trusted DNS E2E. Send only its JSON; two positive results close the admin baseline gap. Any negative result means that port cannot be treated as a trusted-reachable isolation target without further evidence; do not change firewall/service policy to manufacture a baseline.
-
-A new minimal guest rejection probe is only needed if the historical causal witness is absent, under fresh specific authorization and simultaneous read-only observation of an existing matching rule. No full synchronized client-suite rerun is automatically necessary. No secrets should be pasted, and no network/policy/configuration change is requested.
+Do NOT run either synchronized wrapper or the previously suggested admin-baseline command. Reply here with the minimized historical rule match, or state that no historical test-linked event exists. If direct read-only inspection is desired, identify the existing owner-controlled mechanism and its bounded permission; do not send credentials. Expected success is an independently validated test-specific boundary witness, after which Pi can reclassify the retained guest record without replay. If none exists, Pi can prepare the minimal counter-before/one-probe/counter-after attempt described above; no live probe has started.
 
 The procedure below is historical, not authorization to replay.
 
@@ -55,7 +57,7 @@ The procedure below is historical, not authorization to replay.
 
 Owner replied “ok I'm connected to the guest network” after the synchronized guest-workflow proposal. The guest-only owner command is now prepared and offline-tested, NOT run by Pi. It uses the same no-chat-delay synchronization that worked for trusted: two server witnesses are armed first, actual matching kernel readiness confirmed, then the owner's client executes immediately. No idle indefinite collector or silent window rearming. Main95s+cleanup≤20s, each remote observer85s; all operations below120s.
 
-The diagnostic can detect private reachability/protected-path leakage. Without affirmative boundary-denial evidence and trusted-path admin-target baselines, **negative behavior remains NOT VERIFIED**, not a policy pass. Those missing capabilities are explicit in the final classifier; no configuration change or synthetic substitute manufactures them.
+The diagnostic can detect private reachability/protected-path leakage. Without affirmative boundary-denial evidence, **negative behavior remains NOT VERIFIED**, not a policy pass. Those missing capabilities are explicit in the final classifier; no configuration change or synthetic substitute manufactures them.
 
 ## Evidence criteria / preparation plan
 
@@ -63,7 +65,7 @@ The diagnostic can detect private reachability/protected-path leakage. Without a
 - Use one pre-generated exact nonce for direct private DNS UDP/TCP attempts and default-DNS challenge, including potential guest DNS-proxy leakage. Record bounded transport/error/control results, never raw replies or unrelated data.
 - Observe the exact nonce at BOTH the pinned peer's decrypted gateway interface and intended resolver. A resolver-local raw socket alone can miss packets dropped by the resolver host firewall, so it cannot establish that no query traversed the protected tunnel. Gateway observation must exclude Ethernet/MAC headers and all nonnonce packets at the kernel boundary; no broader capture to make tests easier.
 - Read only selected pinned-peer mapping/session/counter metadata, resolver health and nonce arrival timestamps. No endpoints/public IPs, keys or unrelated peer/history output.
-- Protected-destination negatives count only for destinations with real trusted-path positive evidence. Trusted DNS is already proven; do not invent trusted reachability for admin ports merely because their services listen or bastion access works. No fresh trusted-client test is authorized.
+- The required protected endpoint is private DNS/port53, already verified from trusted. TCP22/5380 probes are supplementary; their trusted-positive baselines are not required by the specification or owner's corrected acceptance. No fresh trusted-client test is needed or authorized.
 - Require affirmative test emission/path evidence and an attributable intended-boundary policy rejection before VERIFIED. Public success plus timeout plus zero nonce arrival is **not** proof of where/why it stopped. It could reflect local route failure, a dead path or another firewall. A boundary-generated, test-correlated administrative rejection or existing narrowly filtered deny event can supply causal evidence; generic connection-refused/RST without boundary provenance does not.
 - No guest edge/router login, administration or Pi probing is authorized; no logging/firewall/route changes to manufacture causal evidence. If existing read-only observations cannot expose a positive boundary witness, report NOT VERIFIED with the missing witness, even if behavior is consistent with isolation.
 - Once the single attempt is classified, stop/verify cleanup, expire the grant and report each of the five objectives separately. Guest VERIFIED requires all of them, not silence alone. Never alter the already-verified trusted status.

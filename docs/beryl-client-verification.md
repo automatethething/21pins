@@ -1,4 +1,6 @@
-# Owner-run Beryl client/guest verification — not yet performed
+# Owner-run Beryl client/guest verification — historical procedure
+
+Current: trusted DNS E2E is VERIFIED. The synchronized guest test showed expected public/private behavior and no nonce beyond the monitored boundary, but intended Beryl rejection attribution remains unproven. Required positive protected baseline is verified private DNS/port53; TCP22/5380 are supplementary probes, not mandatory trusted positives. See `beryl-guest-verification.md` for corrected acceptance and the single minimal boundary-witness proposal. Do not rerun the historical commands below.
 
 VM205 approved two-command trust/install/certificate smoke is verified. Existing intended Beryl peer is live/persistent; no peer rewrite needed. VM220 trust remains unchanged; server-side DNS/filter behavior is verified. Actual Beryl-origin fresh handshake/DNS/filter/guest isolation remains unverified.
 
