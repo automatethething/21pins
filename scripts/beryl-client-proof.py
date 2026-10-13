@@ -26,14 +26,15 @@ def wire_result(data,ident,domain):
  if xid!=ident or not flags&0x8000 or flags&0x7a00 or qd!=1 or an+ns+ar>128:raise ValueError('unexpected DNS response')
  q,off=name(12)
  if q!=domain or data[off:off+4]!=struct.pack('!HH',1,1):raise ValueError('wrong question')
- off+=4;ede=False
- for _ in range(an+ns+ar):
-  _,off=name(off)
+ off+=4;ede=False;opt_seen=False
+ for index in range(an+ns+ar):
+  rrname,off=name(off)
   if off+10>len(data):raise ValueError('short RR')
   typ,cl,ttl,n=struct.unpack('!HHIH',data[off:off+10]);off+=10;end=off+n
   if end>len(data):raise ValueError('short RDATA')
-  if typ==41 and (ttl>>16)&255==0:
-   pos=off
+  if typ==41:
+   if opt_seen or rrname or index<an+ns or ttl>>24 or (ttl>>16)&255:raise ValueError('invalid OPT response')
+   opt_seen=True;pos=off
    while pos<end:
     if pos+4>end:raise ValueError('short OPT')
     code,length=struct.unpack('!HH',data[pos:pos+4]);pos+=4

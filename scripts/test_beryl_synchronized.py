@@ -13,6 +13,8 @@ class Checks(unittest.TestCase):
   with self.assertRaises(ValueError):client.wire_result(base+opt,43,'ad.doubleclick.net')
   with self.assertRaises(ValueError):client.wire_result(base+opt[:-1],42,'ad.doubleclick.net')
   with self.assertRaises(ValueError):client.wire_result(base+opt,42,'example.com')
+  badopt=b'\0'+struct.pack('!HHIH',41,1232,1<<24,6)+struct.pack('!HHH',15,2,15)
+  with self.assertRaises(ValueError):client.wire_result(base+badopt,42,'ad.doubleclick.net')
  def test_nonce_and_evidence_gate(self):
   sync=load('sync','beryl-synchronized-proof.py')
   self.assertFalse(sync.correlated({}, {}, {}, {})['trusted_network_E2E_verified'])
