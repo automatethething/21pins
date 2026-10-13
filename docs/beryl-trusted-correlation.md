@@ -1,5 +1,7 @@
 # Trusted-client evidence: historical correlation not verified
 
+Latest: owner approved the owner-started synchronized workflow. It is prepared and offline-tested, NOT yet run. See `beryl-synchronized-proof.md` for the single owner command, exact-nonce readiness gate, binary policy-EDE evidence, bounded cleanup and limitations. No server collector was started during preparation; new one-use authorization remains unconsumed. Trusted E2E and guest isolation remain unverified pending actual evidence.
+
 ## Single authorized follow-up attempt — closed, exception expired
 
 The owner authorized exactly one read-only nonce-only server window through existing management. Pi did NOT execute/simulate the client or change host/network/trust configuration. Before launch, the private readiness marker was absent; kernel-filter readiness was positively verified at `2026-10-13T13:13:20.211060Z`. The bounded95s observer closed cleanly with zero source-bound synthetic queries. The post-observer pinned-peer snapshot was at `2026-10-13T13:14:56.937619Z`; owned PID22028 has exited. The exception was consumed and is now expired; no subsequent management observation is authorized.

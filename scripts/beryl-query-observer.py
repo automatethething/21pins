@@ -3,9 +3,9 @@
 single private source/destination, DNS query port and synthetic pins- challenge.
 Never run on Beryl. No packet/config/endpoint output or persistence.
 """
-import socket,ctypes,ipaddress,time,json,re,select,pathlib,sys,os
+import socket,ctypes,ipaddress,time,json,re,select,pathlib,sys,os,subprocess
 
-def filters(src,dst,proto):
+def filters(src,dst,proto,expected=None):
  p=[];guards=[]
  def add(code,k=0):p.append([code,0,0,k])
  def equal(k):guards.append(len(p));add(0x15,k)
@@ -17,6 +17,11 @@ def filters(src,dst,proto):
  add(0x50,offset-1);equal(21)
  add(0x40,offset);equal(int.from_bytes(b'pins','big'));add(0x50,offset+4);equal(45)
  add(0x40,offset+21);equal(int.from_bytes(b'\x07inv','big'));add(0x40,offset+25);equal(int.from_bytes(b'alid','big'));add(0x50,offset+29);equal(0)
+ if expected:
+  assert re.fullmatch(r'pins-[0-9a-f]{16}\.invalid',expected)
+  label=expected.split('.')[0].encode('ascii')
+  for i in range(0,20,4):add(0x40,offset+i);equal(int.from_bytes(label[i:i+4],'big'))
+  add(0x50,offset+20);equal(label[20])
  add(0x06,65535);add(0x06,0)
  for i in guards:p[i][2]=len(p)-i-2
  return p
@@ -33,12 +38,18 @@ def challenge(packet,proto):
 
 def main():
  m=json.loads(pathlib.Path('/etc/21pins/dns-admin.json').read_text());dst=m['resolver'];src=sys.argv[1];assert ipaddress.ip_address(src).is_private
+ assert m['technitium_unit']=='dns.service'
+ service=subprocess.run(['/usr/bin/systemctl','is-active','dns.service'],capture_output=True,text=True,timeout=3)
+ assert service.returncode==0 and service.stdout.strip()=='active'
  seconds=int(sys.argv[2]) if len(sys.argv)>2 else 95;assert 1<=seconds<=100
+ expected=sys.argv[3] if len(sys.argv)>3 else None
+ if expected:assert re.fullmatch(r'pins-[0-9a-f]{16}\.invalid',expected)
+ stop=pathlib.Path('/tmp/21pins-beryl-observer-stop');assert not stop.exists() and not stop.is_symlink()
  class Filter(ctypes.Structure):_fields_=[('code',ctypes.c_ushort),('jt',ctypes.c_ubyte),('jf',ctypes.c_ubyte),('k',ctypes.c_uint)]
  class Program(ctypes.Structure):_fields_=[('len',ctypes.c_ushort),('filter',ctypes.POINTER(Filter))]
  sockets=[];arrays=[]
  for proto in [17,6]:
-  s=socket.socket(socket.AF_INET,socket.SOCK_RAW,proto);s.bind((dst,0));p=filters(src,dst,proto);a=(Filter*len(p))(*(Filter(*i) for i in p));arrays.append(a);f=Program(len(p),a);s.setsockopt(socket.SOL_SOCKET,26,bytes(f));s.setblocking(False)
+  s=socket.socket(socket.AF_INET,socket.SOCK_RAW,proto);s.bind((dst,0));p=filters(src,dst,proto,expected);a=(Filter*len(p))(*(Filter(*i) for i in p));arrays.append(a);f=Program(len(p),a);s.setsockopt(socket.SOL_SOCKET,26,bytes(f));s.setblocking(False)
   # Discard any pre-filter queued datagrams without copying payload or identifiers.
   libc=ctypes.CDLL(None,use_errno=True);libc.recv.argtypes=[ctypes.c_int,ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int];libc.recv.restype=ctypes.c_ssize_t
   for _ in range(128):
@@ -48,19 +59,22 @@ def main():
     raise RuntimeError('queue purge failed closed')
   else:raise RuntimeError('queue purge bound exceeded')
   sockets.append((s,proto))
- ready=pathlib.Path('/tmp/21pins-beryl-observer-ready');fd=os.open(str(ready),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.write(fd,b'kernel-filter-active');os.close(fd)
+ ready=pathlib.Path('/tmp/21pins-beryl-observer-ready');fd=os.open(str(ready),os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600);os.write(fd,(expected or 'kernel-filter-active').encode());os.close(fd)
  print(json.dumps({'synthetic_only_kernel_filter_active':True,'window_seconds':seconds,'no_MAC_public_IP_or_nonchallenge_query_collection':True}),flush=True)
- end=time.monotonic()+seconds;counts={}
+ end=time.monotonic()+seconds;counts={};epochs={}
  try:
   while time.monotonic()<end:
+   if expected and stop.is_file() and not stop.is_symlink() and stop.stat().st_uid==0 and stop.read_bytes()==expected.encode():break
    selected,_,_=select.select([x[0] for x in sockets],[],[],max(0,min(1,end-time.monotonic())))
    for s in selected:
     proto=next(p for v,p in sockets if v is s);name=challenge(s.recv(2048),proto)
-    if name:row=counts.setdefault(name,{'UDP':0,'TCP':0});row['UDP' if proto==17 else 'TCP']+=1
+    if name and (not expected or name==expected):
+     row=counts.setdefault(name,{'UDP':0,'TCP':0});row['UDP' if proto==17 else 'TCP']+=1;epochs.setdefault(name,[]).append(time.time())
  finally:
   for s,_ in sockets:s.close()
   ready.unlink(missing_ok=True)
- print(json.dumps({'source_bound_synthetic_queries':counts,'observer_closed':True,'not_guest_or_handshake_proof_alone':True}),flush=True)
+  if expected and stop.is_file() and not stop.is_symlink() and stop.stat().st_uid==0 and stop.read_bytes()==expected.encode():stop.unlink()
+ print(json.dumps({'source_bound_synthetic_queries':counts,'query_UTC_epochs':epochs,'observer_closed':True,'technitium_active':True,'not_guest_or_handshake_proof_alone':True}),flush=True)
 def self_test():
  # RFC5737 documentation fixtures, never live endpoints or owner identifiers.
  src=str(ipaddress.IPv4Address(0xc000020a));dst=str(ipaddress.IPv4Address(0xc0000235));name='pins-0123456789abcdef.invalid';q=b'\x15pins-0123456789abcdef\x07invalid\x00\x00\x01\x00\x01';dns=b'\x00'*12+q
@@ -92,6 +106,13 @@ def self_test():
   bad=bytearray(p);bad[12]=11;assert not accept(bad,program)
   bad=p.replace(b'invalid',b'example');assert not accept(bad,program) and challenge(bad,proto) is None
   assert not accept(p[:25],program)
+  exact=filters(src,dst,proto,name);assert accept(p,exact)
+  assert not accept(p.replace(b'0123456789abcdef',b'fedcba9876543210'),exact)
+  ip=bytearray(p[:20]);ip[0]=0x46;options=bytes(ip)+b'\0'*4+p[20:]
+  assert accept(options,exact) and challenge(options,proto)==name
+  if proto==6:
+   tcp=bytearray(p[20:40]);tcp[12]=0x60;options=p[:20]+bytes(tcp)+b'\0'*4+p[40:]
+   assert accept(options,exact) and challenge(options,proto)==name
  print('PASS: kernel filter synthetic UDP/TCP/source/domain/truncation and parser checks')
 def native_self_test():
  # Existing server itself only; never send a probe to Beryl or alter DNS settings.
