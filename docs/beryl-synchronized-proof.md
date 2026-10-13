@@ -1,6 +1,6 @@
 # Owner-started trusted Beryl correlation
 
-Prepared, not run by Pi. The owner approved this workflow after chat-latency windows expired. The new one-use grant is not consumed by preparation or pure tests. Guest isolation is not authorized.
+The owner successfully ran this workflow at14:19:28–14:19:31Z on2026-10-13. Trusted-network E2E is VERIFIED; see `beryl-trusted-correlation.md` for exact nonce/arrival/peer/policy/cleanup evidence. It was never run by Pi. The one-use grant is now expired and guest isolation remains unverified/unauthorized. The command below is retained as historical procedure, NOT authorization to rerun.
 
 ## Human actions required
 

@@ -1,6 +1,20 @@
-# Trusted-client evidence: historical correlation not verified
+# Trusted-network E2E VERIFIED — guest isolation not verified
 
-Latest: owner approved the owner-started synchronized workflow. It is prepared and offline-tested, NOT yet run. See `beryl-synchronized-proof.md` for the single owner command, exact-nonce readiness gate, binary policy-EDE evidence, bounded cleanup and limitations. No server collector was started during preparation; new one-use authorization remains unconsumed. Trusted E2E and guest isolation remain unverified pending actual evidence.
+## Accepted synchronized owner-run evidence (2026-10-13)
+
+Owner supplied the real combined result from the prepared workflow. No client proof was executed or simulated by Pi. Independent deterministic timestamp/delta checks pass:
+
+- Trusted client window: `2026-10-13T14:19:28.812649Z`–`14:19:31.131082Z`; exact fresh nonce `pins-328da44d680fa9e5.invalid`.
+- Intended private Technitium service active. Exact source-bound nonce captured once each on UDP and TCP, at epochs1791901169.455008 and1791901170.692495, both strictly within the client window. Gateway snapshots1791901160.8105702–1791901178.4422054 bracket the run.
+- Root-pinned peer transfer increased RX2688/TX3104bytes. Latest handshake1791901068 was unchanged, age110.442s at post-snapshot: recent authenticated session plus fresh traffic, NOT a new handshake attributed to this run. Aggregate byte deltas are corroborating only; exact nonce/path/timing evidence is mandatory.
+- Public DNS NOERROR/answer and HTTPS succeed. Private allowed controls NOERROR/answer UDP/TCP; synthetic challenges NXDOMAIN UDP/TCP. Blocked controls NXDOMAIN with binary-decoded explicit Blocked/Filtered EDE on BOTH UDP and TCP: policy-generated blocking, not NXDOMAIN alone. The sanitized result does not specify whether EDE code15 or17 was emitted; no unsupported exact-code claim.
+- All combined correlation gates true. Observer closed and cleanup verified; single-attempt exception has expired. The redacted authorization field is not needed as evidence and is not stored here.
+
+**Trusted-network E2E: VERIFIED**, within the documented private-source/pinned-peer operational-correlation limits. The client-only `E2E_complete=false` is intentional: the client alone cannot establish server proof; the combined result does. This is NOT full Beryl/guest completion or physical-client cryptographic attestation.
+
+**Guest isolation: NOT VERIFIED**, separate and not authorized by this one-use exception. No further capture, guest probe, replay or host/network/trust change is authorized. Historical unsuccessful windows below remain preserved, not silently reclassified.
+
+Workflow/procedure: `beryl-synchronized-proof.md`. No additional client run is needed for this trusted checkpoint.
 
 ## Single authorized follow-up attempt — closed, exception expired
 
