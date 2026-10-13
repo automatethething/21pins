@@ -33,4 +33,12 @@ Expected: default public DNS/HTTPS work; private DNS UDP/TCP and private DNS/adm
 
 Do not paste private WG keys, profiles, router pages/screenshots, tokens, passwords, cookies, DNS raw output, packet dumps, MACs, public IPs or real personal query data. Paste only the script's status JSON. It deliberately reports `E2E_complete:false`; Pi only changes objective state after independent fresh handshake/DNS/filter/guest correlation passes. If network policy really fails, report it; do not broaden ACLs or change device settings merely to make the test pass.
 
-This document is a ready manual procedure, not actual completed packet evidence. No client tests have been run by Pi.
+## 2026-10-13 trusted-window reconciliation
+
+Owner readiness was relayed through the linked session. Pi implemented a server-only ≤100s IPv4 observer (no Ethernet/MAC) with kernel filters for exact private source/destination/DNS port and synthetic `pins-<nonce>.invalid` label/prefix/suffix. Only validated synthetic nonce/counts leave root, no raw packets/personal queries/public endpoints. Pre-filter queued data is discarded with a bounded NULL-buffer syscall; readiness file is exclusive/no-follow and removed with closed sockets. Pure filter/parser/source/domain/truncation tests and native **server-SELF** UDP/TCP positive tests pass; SELF tests are not Beryl evidence.
+
+Initial collector startup/cleanup bugs were fixed, exact prior owned process stopped and failed window discarded. A clean 95-second trusted window started with fresh baseline epoch1791893600/handshake1791893571; it exited0 with **zero** source-bound synthetic queries. No owner client status JSON was supplied to this operator. Later peer handshake advanced to1791894059, but without exact nonce/client timing this is NOT client-triggered DNS/filter/handshake proof. Zero capture is UNVERIFIED, not proof of successful isolation or a definite network fault. Window is closed; do not run stale unsynchronized checks.
+
+Both neutral reviewers accept the bounded minimized mechanism and treating empty capture as unverified. Source-IP/nonce plus fresh WG state is operational correlation under the trusted-LAN/root TCB, not cryptographic identity attestation of a particular physical client; an adversarial private-LAN source spoofer remains a residual limitation. No MAC/public-IP collection is added to solve that.
+
+Next owner action: if the trusted script ran, paste only its derived JSON; otherwise be at the trusted-client Terminal and reply `Beryl client proof ready` for a fresh window, then run immediately on RUN NOW. No fresh guest phase until trusted data is reconciled. VM205/VM220 installed trust and networking remain unchanged. No client tests have been run by Pi and E2E remains unverified.
