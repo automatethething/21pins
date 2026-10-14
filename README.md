@@ -51,6 +51,10 @@ Use provider names for credentials and routing namespaces; do not invent provide
 
 This distinction is intentional: future agents should say “Anthropic/Claude” or “OpenAI/Codex” when describing ownership, while preserving the canonical 21pins provider IDs (`anthropic` and `openai`).
 
+## Proposed network policy verification (design only)
+
+The [public product design](docs/superpowers/specs/2026-10-14-network-policy-verification-design.md) centers on **gateway, network, vpn, service, policy/access and verification**: who should reach what, through which protected path, and whether observed behavior matches intent. `vpn` is the stable abstraction over WireGuard, Tailscale and future adapters. Friendly discovery/inspection and scoped verification are proposed—not shipped commands or blanket vendor-support claims. Network gateways are distinct from the existing LLM proxy. No implementation or infrastructure change is included in this specification.
+
 ## Temporary SSH access (opt-in V1)
 
 Give an AI agent temporary SSH access without permanent agent credentials. An objective work lease can last hours; native OpenSSH user certificates last minutes and renew on demand for the same immutable scope/key. SSH authenticates end-to-end at the target—direct by default, or through an explicitly authorized [native management bastion](docs/ssh-bastion.md); no 21pins proxy service, host daemon or session recording.
