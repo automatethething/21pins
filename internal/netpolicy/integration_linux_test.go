@@ -22,11 +22,19 @@ import (
 	"github.com/petrichor/21pins-cli/internal/policy"
 )
 
+func requireIsolatedNetworkRunner(t *testing.T) {
+	t.Helper()
+	if os.Getenv("PINS21_ISOLATED_NETWORK_TEST") != "1" {
+		t.Skip("requires explicitly isolated disposable Linux runner with private mount namespace and writable proc sys")
+	}
+}
+
 func TestLinuxWGDNSE2E(t *testing.T) {
+	requireIsolatedNetworkRunner(t)
 	if os.Geteuid() != 0 {
 		t.Skip("requires authorized isolated Linux runner with namespace capabilities")
 	}
-	for _, tool := range []string{"ip", "wg", "nft", "mount"} {
+	for _, tool := range []string{"ip", "wg", "nft"} {
 		if _, e := exec.LookPath(tool); e != nil {
 			t.Skip("missing isolated-runner prerequisite")
 		}
@@ -87,8 +95,7 @@ func TestLinuxWGDNSE2E(t *testing.T) {
 	for _, pair := range [][2]string{{trusted, trGW}, {guest, guGW}, {server, underGW}} {
 		run("", "ip", "-n", pair[0], "route", "add", "default", "via", pair[1])
 	}
-	// Only this container's proc mount and newly created namespace are affected.
-	run("", "mount", "-o", "remount,rw", "/proc/sys")
+	// Writable proc sys is supplied by the isolated runner; this test never changes mount state.
 	gwContext, _ := namespaceIdentity(gateway)
 	if e := withinNamespace(ctx, Binding{Namespace: gateway, Context: gwContext}, func() error { return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0600) }); e != nil {
 		t.Fatal("isolated namespace forwarding unavailable")
@@ -318,6 +325,156 @@ func TestLinuxWGDNSE2E(t *testing.T) {
 	verify(2, "verify", "access", "private-dns", "--from", "trusted")
 	t.Log("REAL isolated Linux/WireGuard/DNS gate PASS: allow, isolation, leak, unsupported coverage/tool, bounded profiles, state/privacy/observer cleanup")
 }
+func TestOpenWrtKernelCrossModel(t *testing.T) {
+	requireIsolatedNetworkRunner(t)
+	if os.Geteuid() != 0 {
+		t.Skip("requires authorized isolated Linux namespace runner")
+	}
+	for _, tool := range []string{"ip", "nft"} {
+		if _, e := exec.LookPath(tool); e != nil {
+			t.Skip("missing isolated fixture prerequisite")
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Second)
+	defer cancel()
+	run := func(tool string, args ...string) []byte {
+		t.Helper()
+		cctx, done := context.WithTimeout(ctx, 3*time.Second)
+		defer done()
+		out, e := exec.CommandContext(cctx, tool, args...).Output()
+		if e != nil {
+			t.Fatalf("OpenWrt synthetic fixture setup/read failed (%s)", tool)
+		}
+		return out
+	}
+	name := "ow" + strings.TrimPrefix(policy.NewID("x"), "x_")[:8]
+	run("ip", "netns", "add", name)
+	t.Cleanup(func() {
+		c, d := context.WithTimeout(context.Background(), 3*time.Second)
+		defer d()
+		if exec.CommandContext(c, "ip", "netns", "del", name).Run() != nil {
+			t.Error("synthetic OpenWrt namespace cleanup failed")
+		}
+		if _, e := namespaceIdentity(name); e == nil {
+			t.Error("synthetic namespace retained")
+		}
+	})
+	for _, device := range []string{"edge0", "tunnel0", "uplink0"} {
+		run("ip", "-n", name, "link", "add", device, "type", "dummy")
+		run("ip", "-n", name, "link", "set", device, "up")
+	}
+	run("ip", "-n", name, "addr", "add", fixtureIP(1)+"/24", "dev", "edge0")
+	contextID, _ := namespaceIdentity(name)
+	if withinNamespace(ctx, Binding{Namespace: name, Context: contextID}, func() error { return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0600) }) != nil {
+		t.Fatal("synthetic forwarding setup")
+	}
+	for _, table := range []struct{ number, device string }{{"100", "tunnel0"}, {"200", "uplink0"}} {
+		run("ip", "-n", name, "route", "add", "table", table.number, fixtureIP(53)+"/32", "dev", table.device)
+	}
+	run("ip", "-n", name, "rule", "add", "priority", "100", "from", fixtureIP(2), "iif", "edge0", "fwmark", "100/255", "table", "100")
+	nft := func(args ...string) []byte {
+		return run("ip", append([]string{"netns", "exec", name, "nft"}, args...)...)
+	}
+	nft("add", "table", "inet", "fixture")
+	nft("add", "set", "inet", "fixture", "destinations", "{", "type", "ipv4_addr", ";", "}")
+	nft("add", "element", "inet", "fixture", "destinations", "{", fixtureIP(53), "}")
+	for _, c := range owSelectors().Chains {
+		nft("add", "chain", c.Family, c.Table, c.Chain, "{", "type", "filter", "hook", c.Hook, "priority", fmt.Sprint(*c.Priority), ";", "policy", "accept", ";", "}")
+	}
+	nft("add", "rule", "inet", "fixture", "classify", "ip", "saddr", fixtureIP(2), "iifname", "edge0", "ip", "daddr", "@destinations", "meta", "mark", "set", "100")
+	nft("add", "rule", "inet", "fixture", "forward", "ip", "saddr", fixtureIP(2), "iifname", "edge0", "ip", "daddr", fixtureIP(53), "accept")
+	nft("add", "rule", "inet", "fixture", "guard", "ip", "saddr", fixtureIP(2), "iifname", "edge0", "ip", "daddr", fixtureIP(53), "oifname", "!=", "tunnel0", "drop")
+	q, s := owFixture()
+	q.Gateway.Binding.Namespace = name
+	q.Gateway.Binding.Context = contextID
+	q.Target = q.Gateway
+	q.VPN.Binding.Namespace = name
+	q.VPN.Binding.Context = contextID
+	sealOpenWrtQuestion(&q)
+	// Only ubus/UCI are explicitly labeled fixture stubs; kernel ip/nft reads remain real.
+	stubs := t.TempDir()
+	logical := string(s.logical)
+	ubus := "#!/bin/sh\n[ \"$1\" = call ] && [ \"$2\" = network.interface.home ] && [ \"$3\" = status ] || exit 42\nprintf '%s' '" + logical + "'\n"
+	uci := "#!/bin/sh\n[ \"$1\" = -q ] && [ \"$2\" = get ] || exit 42\ncase \"$3\" in network.home.device) printf edge0;; firewall.home_to_uplink.src) printf home;; firewall.home_to_uplink.dest) printf uplink;; firewall.home_to_uplink.enabled) printf 0;; *) exit 42;; esac\n"
+	if os.WriteFile(filepath.Join(stubs, "ubus"), []byte(ubus), 0700) != nil || os.WriteFile(filepath.Join(stubs, "uci"), []byte(uci), 0700) != nil {
+		t.Fatal("fixture status stubs")
+	}
+	t.Setenv("PATH", stubs+":"+os.Getenv("PATH"))
+	c := newCollector(func(context.Context, string) error { return nil })
+	c.fixture = true
+	fingerprint := func() string {
+		return hashJSON([]any{owSemantic(run("ip", "-n", name, "-j", "-4", "rule", "show")), owSemantic(run("ip", "-n", name, "-j", "-4", "route", "show", "table", "100")), owSemantic(nft("-j", "list", "table", "inet", "fixture"))})
+	}
+	has := func(out Collection, p string) bool {
+		for _, f := range out.Facts {
+			if f.Property == p && f.Value {
+				return true
+			}
+		}
+		return false
+	}
+	before := fingerprint()
+	out := c.collect(ctx, q)
+	if !has(out, "gateway.policy_scope") || has(out, "enforcement.guard") || has(out, "source.binding") || has(out, "path.selection") {
+		t.Log("missing:", out.Missing)
+		t.Fatal("unknown production closure/origin became complete evidence or supported scope missing")
+	}
+	if fingerprint() != before {
+		t.Fatal("read-only adapter mutated synthetic kernel state")
+	}
+	if len(out.Capabilities) != 1 || out.Capabilities[0].Support != Partial {
+		t.Fatal("fixture became firmware support claim")
+	}
+	c.closed = map[string]bool{contextID: true}
+	out = c.collect(ctx, q)
+	if !has(out, "routing.policy_selection") || !has(out, "forwarding.permission") || !has(out, "enforcement.guard") {
+		t.Log("missing:", out.Missing)
+		t.Fatal("synthetic closed cross-model normalization incomplete")
+	}
+	if a := Evaluate(q.Request, out.Facts, time.Now().UTC(), out.Cleanup, true); a.Verdict != Verified || len(a.Properties) != 4 {
+		t.Fatal("finite gateway profile widened")
+	}
+	snap, e := readOpenWrtSnapshot(ctx, q, c.permit, c.readNamespace)
+	if e != nil || !normalizeOpenWrt(q, snap).vpnSelected {
+		t.Fatal("real marked RPDB selection not normalized")
+	}
+	// Higher-priority real kernel selection overrides desired/main route without changing forwarding permission.
+	run("ip", "-n", name, "rule", "add", "priority", "50", "from", fixtureIP(2), "iif", "edge0", "fwmark", "100/255", "table", "200")
+	snap, e = readOpenWrtSnapshot(ctx, q, c.permit, c.readNamespace)
+	if e != nil {
+		t.Fatal("priority override snapshot")
+	}
+	normalized := normalizeOpenWrt(q, snap)
+	if normalized.vpnSelected || !normalized.routeSelected || !normalized.guardCandidate {
+		t.Fatal("effective precedence/path/guard conflated")
+	}
+	nft("flush", "chain", "inet", "fixture", "guard")
+	out = c.collect(ctx, q)
+	if has(out, "enforcement.guard") || !has(out, "forwarding.permission") {
+		t.Fatal("forwarding permission became enforcement guard")
+	}
+	// Runtime change between samples is stale, never a composite proof.
+	changed := false
+	c.run = func(cctx context.Context, namespace, tool string, args ...string) ([]byte, error) {
+		if tool == "uci" && !changed {
+			changed = true
+			run("ip", "-n", name, "rule", "del", "priority", "50")
+		}
+		return runNative(cctx, namespace, tool, args...)
+	}
+	out = c.collect(ctx, q)
+	if len(out.Facts) != 0 || len(out.Missing) == 0 {
+		t.Fatal("mixed kernel snapshots accepted")
+	}
+	c.run = runNative
+	nft("delete", "element", "inet", "fixture", "destinations", "{", fixtureIP(53), "}")
+	out = c.collect(ctx, q)
+	if len(out.Facts) != 0 || len(out.Missing) == 0 {
+		t.Fatal("ambiguous set nonmembership promoted")
+	}
+	t.Log("REAL kernel OpenWrt cross-model gate PASS; ubus/UCI synthetic only, live firmware UNVERIFIED; read-only state and namespace cleanup checked")
+}
+
 func startFixtureDNS(t *testing.T, ctx context.Context, b Binding, addresses []string) (func(), func(string)) {
 	t.Helper()
 	var packets []net.PacketConn

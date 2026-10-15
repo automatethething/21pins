@@ -41,7 +41,7 @@ func owChain(c BoundChain, rules ...[]map[string]any) []byte {
 func owFixture() (Question, openWrtSnapshot) {
 	gateway := Object{Ref: Ref{"net_gateway", 1}, Kind: Gateway, Alias: "router", Binding: Binding{Context: "ctx_fixture", Interface: "edge0", Address: fixtureIP(1), Target: fixtureIP(53), OpenWrt: owSelectors()}}
 	source := Object{Ref: Ref{"net_source", 1}, Kind: Network, Alias: "home", Binding: Binding{Context: "ctx_client", Address: fixtureIP(2), Ingress: "edge0", OpenWrt: &OpenWrtBinding{LogicalNetwork: "home"}, Gateway: gateway.Ref}}
-	q := Question{Gateway: gateway, Target: gateway, Source: source, VPN: Object{Ref: Ref{"net_vpn", 1}, Kind: VPN, Binding: Binding{Interface: "tunnel0"}}}
+	q := Question{Gateway: gateway, Target: gateway, Source: source, VPN: Object{Ref: Ref{"net_vpn", 1}, Kind: VPN, Binding: Binding{Interface: "tunnel0", Context: gateway.Binding.Context, Namespace: gateway.Binding.Namespace, Gateway: gateway.Ref}}}
 	q.Request = ObservationRequest{Operation: "gateway", Target: gateway.Ref, Objects: []Ref{gateway.Ref, source.Ref, q.VPN.Ref}, Required: Properties("gateway", Binding{}), MetadataDigest: "fixture"}
 	s := openWrtSnapshot{scope: openWrtScope(q), context: gateway.Binding.Context, start: time.Now().UTC().Add(-time.Second), end: time.Now().UTC(), chains: map[string][]byte{}, stored: map[string]string{"home_to_uplink.enabled": "0"}, setKnown: true, setMember: true, closed: true, synthetic: true}
 	s.logical = owJSON(map[string]any{"up": true, "l3_device": "edge0", "ipv4-address": []any{map[string]any{"address": fixtureIP(1), "mask": 24}}})
@@ -216,6 +216,38 @@ func owFixtureRead(q Question, s openWrtSnapshot, calls *int) func(context.Conte
 			return s.set, nil
 		}
 		return nil, ErrUnsupported
+	}
+}
+func TestOpenWrtRelatedVPNBinding(t *testing.T) {
+	r, _, _ := testObjects(t)
+	objects := []Object{{Kind: Gateway, Alias: "edge", Binding: Binding{Context: "ctx_router", OpenWrt: owSelectors(), VPN: Ref{ID: "link"}}}, {Kind: VPN, Alias: "link", Binding: Binding{Protocol: "wireguard", Context: "ctx_router", Interface: "tunnel0", Gateway: Ref{ID: "edge"}}}}
+	raw := owJSON(map[string]any{"objects": objects})
+	if e := r.Import(strings.NewReader(string(raw))); e != nil {
+		t.Fatal(e)
+	}
+	question, e := r.Question("gateway", "edge", "", nil)
+	if e != nil || question.VPN.Alias != "link" {
+		t.Fatal("registered VPN context not resolved", e)
+	}
+	q, s := owFixture()
+	q.VPN.Binding.Context = "ctx_other"
+	s.scope = openWrtScope(q)
+	n := normalizeOpenWrt(q, s)
+	if n.guardCandidate || n.vpnSelected {
+		t.Fatal("other namespace VPN became protected-path/guard identity")
+	}
+}
+
+func TestOpenWrtScalarMemberNativeSyntax(t *testing.T) {
+	q, _ := owFixture()
+	raw := "table inet fixture { set destinations { type ipv4_addr elements = { " + q.Gateway.Binding.Target + " } } }"
+	if !owMember(q, []byte(raw)) {
+		t.Fatal("successful scoped native scalar element reply rejected")
+	}
+	for _, bad := range []string{strings.Replace(raw, "destinations", "other", 1), strings.Replace(raw, "ipv4_addr", "ipv6_addr", 1), strings.Replace(raw, " } } }", ", extra } } }", 1), raw + " trailing"} {
+		if owMember(q, []byte(bad)) {
+			t.Fatal("ambiguous/unbound element reply accepted")
+		}
 	}
 }
 func TestOpenWrtReadCanceledResultCannotBecomeEvidence(t *testing.T) {

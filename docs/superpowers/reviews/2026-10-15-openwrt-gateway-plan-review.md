@@ -1,6 +1,6 @@
 # OpenWrt / GL.iNet evidence plan — independent review
 
-**Final status: APPROVED (round3). Owner implementation approval: PENDING.**
+**Final plan status: APPROVED (round3). Owner implementation approval: GRANTED.** Four implementation tasks subsequently completed; see [implementation validation](2026-10-15-openwrt-implementation-review.md).
 
 Plan: [four-task read-only gateway evidence slice](../plans/2026-10-15-openwrt-gateway-evidence.md). Product gate: [synthetic CLI review](2026-10-15-network-cli-product-smoke.md), no blocking product-model issue. Mass-market presentation/readiness findings are not hidden or implemented in this adapter plan.
 
@@ -28,4 +28,4 @@ Reviewer confirmed bounded/actionable tasks; DTO/ownership/digest rules; finite 
 
 ## Owner gate
 
-No adapter code, test VM/image, device read, new grant/privilege/trust, private dogfood or Tailscale implementation has started. Initial firewall evidence is explicitly fw4/nft only; unknown/fw3 evidence remains partial, not advertised support. Review the plan in Dashboard → Key Drafts →21pins and reply **Approve OpenWrt plan** to authorize its four tasks. This is a separate approval from the accepted Linux/WireGuard/DNS slice.
+At plan-review time no adapter code or fixture had started. Owner subsequently approved the four tasks, now fixture/kernel validated; no live device read, new grant/privilege/trust, private dogfood or Tailscale implementation occurred. Initial firewall evidence is explicitly fw4/nft only; unknown/fw3 evidence remains partial, not advertised support. The approved plan is no longer waiting in Key Drafts. This is a separate approval from the accepted Linux/WireGuard/DNS slice.

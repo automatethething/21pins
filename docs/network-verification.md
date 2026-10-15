@@ -1,6 +1,6 @@
 # Network verification — first slice
 
-This is an additive local CLI surface. It does not change the LLM proxy, execution-grant schemas/semantics, signed legacy receipts, SSH roles/certificates, existing hosts or native VPN configuration. No OpenWrt/GL.iNet, Tailscale or other vendor/protocol adapter is implemented here.
+This is an additive local CLI surface. It does not change the LLM proxy, execution-grant schemas/semantics, signed legacy receipts, SSH roles/certificates, existing hosts or native VPN configuration. An optional read-only OpenWrt/GL.iNet evidence adapter is now fixture-validated (see below); live firmware compatibility remains UNVERIFIED. Tailscale and other vendor/protocol adapters are not implemented.
 
 ## What ships locally
 
@@ -95,14 +95,29 @@ Operations have a100s total bound, short subcommand/socket deadlines and explici
 
 Outputs are readable JSON (`--json` is accepted explicitly), with friendly source/target/registered-VPN labels, immutable refs, execution-grant ID and identical scope/assurance. Facts retain actual probe and observer windows; historical-baseline reuse preserves its original times and assessment reference. Exit0 VERIFIED;1 VIOLATED;2 UNVERIFIED;3 invalid request / operational failure. Immutable local assessment files are not legacy signed receipts or tamper-proof attestations. Resolved assessments have30day retention; unresolved cleanup records are retained.
 
+## Optional OpenWrt evidence adapter — fixture validated
+
+The same `gateway` / `network` objects can now carry optional `openwrt` native selectors; GL.iNet is a capability-specific OpenWrt profile, not another public object. Profiles `fw4-basic` and `gl-policy-fw4` are reader hints only. Actual runtime must match the finite supported subset. **Live OpenWrt/GL.iNet firmware compatibility remains UNVERIFIED.** fw3/iptables and Tailscale are not implemented.
+
+Gateway selectors bind a logical network, exact family/table/chain roles and expected hook/priority, at most one scalar IPv4 destination set and named non-secret stored firewall sections. A source network can carry only its logical-network name plus its existing gateway reference. Binding selectors are canonical deep-owned snapshots; friendly names are not authority, rebinding invalidates evidence, and native source/client/router namespaces stay distinct. Omitted selectors retain existing Linux JSON/digests.
+
+Only admitted `verify` collection runs fixed local ubus status, selected UCI getters, one-family bounded RPDB metadata, exact chain/one-target set reads and source/ingress/derived-mark kernel lookup. It never enumerates all ubus/config/ruleset/set contents, logs in, reads VPN keys, installs tools, changes config, repairs routes or introduces another transport. Maximum32 reads,64KiB each,3s per call,85s acquisition within the existing100s operation. Active state is sampled before/after; drift, unsupported shape or missing rights is unknown. Inspect/discover remain metadata-only.
+
+Normalization keeps stored settings separate from active rules. Forwarding permission, prospective route selection and effective enforcement guard remain independent. Only exact IPv4 selectors, constant full-mark assignments, scalar set membership and the documented bounded call/precedence subset are understood. Unsupported masked/ct-mark expressions, NAT/offload/overrides, unknown source identity and incomplete graphs do not become complete facts. A route lookup is never an observed access path, and a logical/subnet association is never client-origin proof.
+
+The existing evaluator alone owns verdicts. Gateway still has exactly its four properties; extra native facts do not certify attached access policies. Production global override coverage remains unknown, so guard/isolation remains UNVERIFIED where that proof is required. Private fixture closure cannot be imported or enabled by a CLI switch. Current read-only collection does not manufacture access/isolation client probes; those existing requirements remain unsatisfied without their actual evidence. The returned platform capability is partial, never blanket firmware support.
+
+[Implementation review and test evidence](superpowers/reviews/2026-10-15-openwrt-implementation-review.md).
+
 ## Verification gate
 
 ```sh
 go test ./...
 go test -race ./internal/netpolicy ./cmd/21pins
 go vet ./...
-# Only on an authorized isolated Linux runner with ip/nft/wg and namespace capabilities:
-go test -tags=netpolicy_integration ./internal/netpolicy -run TestLinuxWGDNSE2E -count=1 -v -timeout=100s
+# ONLY in a disposable private mount/network test runner with writable proc sys already supplied:
+# Never set this marker on a live host/router. Tests themselves do not remount filesystems.
+PINS21_ISOLATED_NETWORK_TEST=1 go test -race -tags=netpolicy_integration ./internal/netpolicy -count=1 -v -timeout=100s
 ```
 
 The real integration uses fresh owned namespaces, synthetic keys/identities, a native WireGuard pair, nft guards, UDP/TCP DNS servers and actual source-bound observers. It exercises metadata import→discovery/inspection→offline request→existing-grant admission→real allow/isolation→receipt, then a real leak, unsupported coverage/tool and broken positive control/service. All fixture namespaces, keys, sockets and temporary records are removed. Missing prerequisites/SKIP are **not** a passing integration gate.

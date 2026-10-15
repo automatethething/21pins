@@ -672,6 +672,7 @@ func normalizeOpenWrt(q Question, s openWrtSnapshot) openWrtEvidence {
 		}
 		return *a.Priority < *b.Priority
 	})
+	boundVPN := q.VPN.Ref.ID != "" && q.VPN.Binding.Gateway == q.Gateway.Ref && q.VPN.Binding.Context == q.Gateway.Binding.Context && q.VPN.Binding.Namespace == q.Gateway.Binding.Namespace
 	markKnown := false
 	mark := uint32(0)
 	forwardSeen := false
@@ -724,7 +725,7 @@ func normalizeOpenWrt(q Question, s openWrtSnapshot) openWrtEvidence {
 				}
 				return "accept", true
 			case "drop", "reject":
-				if chain.bound.Role == "guard" && r.source != "" && r.destination != "" && r.ingress != "" && (r.oifNot == "" || q.VPN.Binding.Interface != "" && r.oifNot == q.VPN.Binding.Interface) {
+				if chain.bound.Role == "guard" && r.source != "" && r.destination != "" && r.ingress != "" && (r.oifNot == "" || boundVPN && q.VPN.Binding.Interface != "" && r.oifNot == q.VPN.Binding.Interface) {
 					n.guardCandidate = true
 				}
 				if r.oifNot != "" {
@@ -766,7 +767,7 @@ func normalizeOpenWrt(q Question, s openWrtSnapshot) openWrtEvidence {
 		n.routeSelected, _, _ = owRoutePolicy(q, s, mark)
 		if n.routeSelected {
 			_, dev, _ := owRoutePolicy(q, s, mark)
-			n.vpnSelected = q.VPN.Binding.Interface != "" && dev == q.VPN.Binding.Interface
+			n.vpnSelected = boundVPN && q.VPN.Binding.Interface != "" && dev == q.VPN.Binding.Interface
 		} else {
 			supported = false
 			n.missing = append(n.missing, "openwrt_rpdb_coverage")

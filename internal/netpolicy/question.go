@@ -35,6 +35,10 @@ func (r *Registry) Question(operation, name, source string, baseline *Assessment
 			if e != nil {
 				return q, e
 			}
+			q.VPN, e = resolve(target.Binding.VPN)
+			if e != nil {
+				return q, e
+			}
 		}
 		q.Request.Required = Properties(operation, target.Binding)
 	case "vpn":

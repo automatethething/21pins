@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing Go1.24/stdlib, `internal/netpolicy`, bounded local Linux reads; synthetic fixture tests. No dependency, SDK, daemon, remote transport or new privilege.
 
-**Status:** Independently APPROVED round3 — [review record](../reviews/2026-10-15-openwrt-gateway-plan-review.md). Owner implementation approval GRANTED for all four tasks under one writer. Work in progress; live/private-device access remains separately unauthorized. Baseline `a4885e0` remains accepted.
+**Status:** Independently APPROVED round3 — [review record](../reviews/2026-10-15-openwrt-gateway-plan-review.md). Owner implementation approval GRANTED for all four tasks under one writer. All four tasks IMPLEMENTED / VERIFIED against synthetic fixtures and real isolated kernel gates; [implementation review](../reviews/2026-10-15-openwrt-implementation-review.md). Live firmware compatibility remains UNVERIFIED; live/private-device access remains unauthorized. Baseline `a4885e0` remains accepted.
 
 ---
 
@@ -20,7 +20,7 @@
 
 Alternatives rejected: a separate GL.iNet object/CLI (duplicates the model); a universal fw3/fw4/vendor/plugin framework (too large). A later firmware/backend slice requires its own bounded plan. Tailscale and all other vendors/protocol adapters remain deferred until the owner accepts this gateway cross-model validation.
 
-No current device inspection, credentials, installation, configuration changes, probes, private snapshot import or product implementation is authorized now. Future private dogfood is a separate, explicitly bounded use of existing access; it does not create transport/trust authority or product fixture data.
+Owner-approved local implementation and isolated fixture testing have completed. No current/private device inspection, credentials, existing configuration changes, live probes or private snapshot import was authorized or performed. Future private dogfood is a separate, explicitly bounded use of existing access; it does not create transport/trust authority or product fixture data.
 
 ## 2. Facts and non-equivalences
 
@@ -176,11 +176,15 @@ Local deterministic parsing occurs before normalized facts leave the collector. 
 - [ ] Run `go test ./...`, `go test -race ./internal/netpolicy ./cmd/21pins`, `go vet ./...`, Linux amd64/arm64 build and existing real Linux/WireGuard/DNS gate. No SKIP counts as native release evidence. `git diff --check`; only planned slice files staged, unrelated website changes preserved.
 - [ ] Update docs with exact backend/profile capabilities, unknown coverage and stored-vs-runtime caveats. No new public vendor commands, automatic repair, expanded grant semantics or all-GL.iNet support claim. Commit `test(network): validate OpenWrt evidence against generic contracts`.
 
+## Execution record
+
+The checklists above retain the approved procedure; all four tasks have passed their focused and integration gates. Task1 `ad3b236`, Task2 `2f26f0a`, Task3 `8edb87a`, Task4 final cross-model/test/docs commit. Full Go/race/vet, both Linux builds, Node/Pi7/7, the existing real WireGuard/DNS gate and the new real kernel cross-model gate PASS. Independent implementation review accepted the corrected isolated-runner/VPN-context boundaries. Fixture ubus/UCI are not a live firmware support claim.
+
 ## 6. Review / stop gate
 
 Independent fresh-context plan review must check scope, reachability of admission/collection, omitted-binding compatibility, source identity, precedence completeness, backend limitations, privacy and fixture-vs-production assurance. Parent is sole writer; reviewers read only. Resolve blocking findings before presenting for approval.
 
-**After review: stop for explicit owner approval.** No Task1, implementation, live read, probe, image/VM setup, new trust or later adapter before that approval. The next cross-model target remains Tailscale only after OpenWrt/GL.iNet gateway validation is accepted; it is not authorized here.
+**Owner approved and the four implementation tasks are complete.** That approval did not authorize private/live-device reads, new trust or later adapters; these remain outside the completed slice. The next cross-model target remains Tailscale only after OpenWrt/GL.iNet gateway validation is accepted; it is not authorized here.
 
 ## Public semantic references (not collection authority)
 

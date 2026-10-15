@@ -51,6 +51,13 @@ func owMember(q Question, raw []byte) bool {
 	if target == "" {
 		target = q.Gateway.Binding.Target
 	}
+	// Some nft builds ignore -j for get-element and return this exact scalar grammar.
+	// No arbitrary success/text, extra elements, flags or different identity are accepted.
+	if !json.Valid(raw) {
+		parts := strings.Fields(strings.NewReplacer("{", " { ", "}", " } ").Replace(string(raw)))
+		expected := []string{"table", set.Family, set.Table, "{", "set", set.Name, "{", "type", "ipv4_addr", "elements", "=", "{", target, "}", "}", "}"}
+		return strings.Join(parts, " ") == strings.Join(expected, " ")
+	}
 	var body struct{ Nftables []map[string]json.RawMessage }
 	if json.Unmarshal(raw, &body) != nil {
 		return false
