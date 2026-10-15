@@ -287,6 +287,14 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 		}
 	}
 	p.supported = p.supported && chain
+	p.digest = hashJSON(struct {
+		Hook      string
+		Supported bool
+		Denied    map[string]bool
+		Marks     map[string]uint32
+		Forwarded map[string]bool
+		Guards    map[string]string
+	}{p.hook, p.supported, p.denied, p.marks, p.forwarded, p.guards})
 	return p
 }
 func (c *collector) policy(ctx context.Context, gateway Object, target string) (nftPolicy, error) {
@@ -338,6 +346,8 @@ func (c *collector) collect(ctx context.Context, q Question) Collection {
 		return result
 	}
 	switch q.Request.Operation {
+	case "access", "isolation":
+		return c.collectDNS(ctx, q)
 	case "gateway":
 		b := q.Target.Binding
 		if b.Context == "" {
