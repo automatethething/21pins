@@ -192,7 +192,7 @@ func bindRefs(objects []Object, b *Binding) error {
 	for _, pair := range []struct {
 		ref  *Ref
 		kind Kind
-	}{{&b.Gateway, Gateway}, {&b.VPN, VPN}, {&b.Source, Network}} {
+	}{{&b.Gateway, Gateway}, {&b.VPN, VPN}, {&b.Source, Network}, {&b.Control, Service}} {
 		if pair.ref.ID == "" {
 			continue
 		}

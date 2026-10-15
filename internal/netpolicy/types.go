@@ -35,6 +35,7 @@ type Binding struct {
 	Namespace   string `json:"namespace,omitempty"`
 	Context     string `json:"context,omitempty"`
 	Interface   string `json:"interface,omitempty"`
+	Ingress     string `json:"ingress,omitempty"`
 	Address     string `json:"address,omitempty"`
 	Peer        string `json:"peer,omitempty"`
 	Target      string `json:"target,omitempty"`
@@ -44,6 +45,7 @@ type Binding struct {
 	Gateway     Ref    `json:"gateway,omitempty"`
 	VPN         Ref    `json:"vpn,omitempty"`
 	Source      Ref    `json:"source,omitempty"`
+	Control     Ref    `json:"control,omitempty"`
 	NftFamily   string `json:"nft_family,omitempty"`
 	NftTable    string `json:"nft_table,omitempty"`
 	NftChain    string `json:"nft_chain,omitempty"`
@@ -66,7 +68,7 @@ func validObject(o Object) bool {
 	default:
 		return false
 	}
-	for _, v := range []string{o.Binding.Namespace, o.Binding.Interface, o.Binding.NftTable, o.Binding.NftChain, o.Binding.Realm} {
+	for _, v := range []string{o.Binding.Namespace, o.Binding.Interface, o.Binding.Ingress, o.Binding.NftTable, o.Binding.NftChain, o.Binding.Realm} {
 		if v != "" && !nativePattern.MatchString(v) {
 			return false
 		}
