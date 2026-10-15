@@ -1,0 +1,176 @@
+{
+  "status": "INCOMPLETE_NO_COMPATIBILITY_CLAIM",
+  "recorded_utc": "2026-10-15T23:36:37.607779+00:00",
+  "source_commit": "214aad5",
+  "image": {
+    "release": "24.10.4",
+    "target": "x86/64",
+    "image": "openwrt-24.10.4-x86-64-generic-ext4-combined.img.gz",
+    "compressed_sha256": "57f43d2a665646b0c45b909328704796db1777f85cc0c8ad51ec9b830d34ffc5",
+    "base_sha256": "1ccfec0626acad4ad94e1b3eb90975e3e7464b146b5030666e01ab962bb1d637",
+    "image_checksum_verified": true,
+    "gzip_crc_verified": true,
+    "signed_trailer_bytes": 34,
+    "trailer_sha256": "d9269d96764a1e05a784b1caf7d817b462d95a06fbc56d1788d3c15ccc876a73",
+    "base_manifest_sha256": "989e9ce44f7e9f8cf4c278d68b300c91a48e3d44980d60afe98fdd37c49a3b65"
+  },
+  "real_guest": {
+    "release": "24.10.4",
+    "revision": "r28959-29397011cc",
+    "target": "x86/64",
+    "kernel": "6.6.110"
+  },
+  "native_package_versions": {
+    "firewall4": "2024.12.18~18fc0ead-r1",
+    "nftables-json": "1.1.1-r1",
+    "ubus": "2025.10.17~60e04048-r1",
+    "ubusd": "2025.10.17~60e04048-r1",
+    "uci": "2025.01.20~16ff0bad-r1",
+    "kernel": "6.6.110~484466e2719a743506c36b4bb2103582-r1",
+    "ip-full": "6.11.0-r1",
+    "kmod-dummy": "6.6.110-r1",
+    "kmod-veth": "6.6.110-r1"
+  },
+  "package_authentication": {
+    "signed_indices_verified": 3,
+    "signature_ok": true,
+    "installation_ok": true,
+    "trust": "image-existing-vendor-keys; temporary same-release file mirrors; no key/signature bypass"
+  },
+  "authenticated_package_payloads": {
+    "zlib": {
+      "version": "1.3.1-r1",
+      "file": "zlib_1.3.1-r1_x86_64.ipk",
+      "sha256": "e37b84681c6b7ab4521a88efa21aa97d832aaa9a4d7aa5d954bffc81d1a542ce",
+      "feed": "base"
+    },
+    "libelf1": {
+      "version": "0.192-r1",
+      "file": "libelf1_0.192-r1_x86_64.ipk",
+      "sha256": "e115b8f2a73344174e1d426c4083a93ffc1c45f92a18b1e71d6bc620dc43fe04",
+      "feed": "base"
+    },
+    "libbpf1": {
+      "version": "1.5.0-r1",
+      "file": "libbpf1_1.5.0-r1_x86_64.ipk",
+      "sha256": "179eabc6d5471f201b44ee8b3543ecf88027745124ccd63b85688023d94a87bc",
+      "feed": "base"
+    },
+    "ip-full": {
+      "version": "6.11.0-r1",
+      "file": "ip-full_6.11.0-r1_x86_64.ipk",
+      "sha256": "b07c45215a6e75523df8e5c0ab3e3d8f94ad01356b93a7bc33609e7882f2faec",
+      "feed": "base"
+    },
+    "kmod-dummy": {
+      "version": "6.6.110-r1",
+      "file": "kmod-dummy_6.6.110-r1_x86_64.ipk",
+      "sha256": "d4c5bcbb5061a60a7f3e7f314b00148128ff9b03945269e0866e395c790f287b",
+      "feed": "kmods"
+    },
+    "kmod-veth": {
+      "version": "6.6.110-r1",
+      "file": "kmod-veth_6.6.110-r1_x86_64.ipk",
+      "sha256": "3550f88a8ee1775129c8d0a79510bcbe5a8ab63d3a52aef55bd6bd53c39236f9",
+      "feed": "kmods"
+    }
+  },
+  "feed_index_digests": {
+    "core": {
+      "packages_sha256": "58c7eb3db4c83898245f084c481df31469e774c8b41c7ea382b9d9cc59cfcbd8",
+      "signature_sha256": "2674bf2d841dae3bb25a0e93d7865e1315ac6dd39b577a2e079ce9e8b9af0806"
+    },
+    "base": {
+      "packages_sha256": "3ceb2749b477b9d0cd5255b70bf23b258de579310d9dcdac091bdf52dc70cef7",
+      "signature_sha256": "eb14fdb49c45e775b74435f9ca4a0ce12e00c14f9f8dff8e8e00dc9a8296029f"
+    },
+    "kmods": {
+      "packages_sha256": "20acb4def8a766b7596a6addb4c65b3007ea8d6215e41ee7c977ceacdc842fbb",
+      "signature_sha256": "13871026ffe296583857a518e6401c3c2a2e6182759729c0405274f22563002b"
+    }
+  },
+  "native_entry_digests": {
+    "fw4": {
+      "entry_sha256": "607e0e3153d5205d7fa12382bcd1046300a7609783f1db0edc8a00c2c6efc028",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    },
+    "nft": {
+      "entry_sha256": "fff8d7e59223438ebde55297f69c743360fa9b0d857bd5a02f3aaae590c51968",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    },
+    "ip": {
+      "entry_sha256": "afb8eacc0ad00b41ba0678d102c53651d5b368da3abe4a214fb0d62f8f3bdc12",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    },
+    "ubus": {
+      "entry_sha256": "d8ab6c9309607953312b53ca0f604b99abd32745a665751db74fa436f7d3c100",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    },
+    "ubusd": {
+      "entry_sha256": "f299e17d8ca8aaeadc4556274c9d3643572efc8f74ffb796b203d2181a04aa02",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    },
+    "uci": {
+      "entry_sha256": "7bd93610c609fd355f1ed19f22d8542ed94c259102156b78920022ce3ba8e755",
+      "provenance": "stopped_owned_guest_filesystem_not_execution_attestation"
+    }
+  },
+  "validation_binary_sha256": "dfd664ef2bf08c2a5b02a1efa7dc91ee22dad954bb333af1f1f1294d76aecd62",
+  "driver_sha256": "662174d217cc79123802f2402fb3b405065ce47f9bfee8bb06e3c5e755e52361",
+  "controller_sha256": "7bf8413cc9acb3277bd78e875e17a0d208a2c3710b4a7880a01fa613ce8c8fd5",
+  "isolation": {
+    "guest_nic": "none",
+    "runner_network": "none",
+    "ssh_used": false,
+    "host_trust_or_credentials_changed": false,
+    "host_network_configuration_changed": false,
+    "host_qemu_installed": false
+  },
+  "execution": {
+    "guest_boots": 3,
+    "serial_input_repaired_without_adapter_change": true,
+    "validation_invocation_exit": 137,
+    "durable_semantic_result": false,
+    "definitive_interruption_cause": "UNCONFIRMED",
+    "controller_stopped": true,
+    "controller_final_exit": 0,
+    "synthetic_setup_present_offline": {
+      "network": true,
+      "firewall": true
+    },
+    "failed_harness_audit_commit": "e6af55d0ce9d303dd0377e7e384ff1c0935ec140",
+    "failed_harness_rolled_back_from_final_tree": true,
+    "local_record_times_utc": {
+      "serial-check-result.json": "2026-10-15T23:18:17.317425+00:00",
+      "preflight-result.json": "2026-10-15T23:18:28.685929+00:00",
+      "package-result.json": "2026-10-15T23:20:11.862939+00:00",
+      "recovered.json": "2026-10-15T23:34:52.644617+00:00"
+    }
+  },
+  "supported_fw4_semantics": "NOT_ESTABLISHED: no durable assertion results; setup evidence is not a pass",
+  "negative_controls": "NOT_ESTABLISHED: no durable assertion results; intended UNVERIFIED behavior not certified",
+  "generic_contract_defect": "NOT_CONFIRMED; incomplete execution cannot clear contract-negative gates",
+  "compatibility": "UNVERIFIED; no firmware/subset support claim published",
+  "cleanup": {
+    "owned_container_count_before_vm_deletion": 0,
+    "owned_vm_deleted_with_data": true,
+    "owned_docker_context_absent": true,
+    "active_context_preserved": true,
+    "owned_profile_directory_absent": true,
+    "owned_lima_vm_directory_absent": true,
+    "owned_data_disk_directory_absent": true,
+    "local_download_payload_binary_staging_removed": true,
+    "temporary_locator_and_helper_files_removed": true,
+    "owned_recovery_and_lab_images_removed_with_runtime_data": true,
+    "prefixed_lima_vm_and_data_directories_absent": true,
+    "host_qemu_binaries_absent": true,
+    "zero_owned_lab_runtime_resources": true
+  },
+  "current_regressions": {
+    "go_test_all": "PASS",
+    "go_vet_all": "PASS",
+    "key_drafts_links": "PASS",
+    "draft_viewer": "PASS",
+    "key_drafts_validator": "PASS;8 entries"
+  }
+}

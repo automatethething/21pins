@@ -1,6 +1,6 @@
 # Controlled Real-OpenWrt/fw4 Validation Plan
 
-> **Execution:** one writer, @superpowers:executing-plans after owner approval. Validation harness/docs only; product source remains `214aad5`. **Planning only now: no image/package download, VM boot or live collection.**
+> **Execution:** one writer, @superpowers:executing-plans after owner approval. Validation harness/docs only; product source remains `214aad5`. **Owner-approved execution attempted; outcome INCOMPLETE/UNVERIFIED. The three-boot budget is exhausted; no further guest run is authorized by this plan.**
 
 **Goal:** Establish a version-bound compatibility claim for the implemented fw4 subset using real OpenWrt kernel, netifd/ubus, UCI, fw4, nft and iproute—not the previous ubus/UCI stubs.
 
@@ -8,7 +8,7 @@
 
 **Tech stack:** Existing Colima/Docker; QEMU TCG installed only inside the disposable test runner (not on the Mac), official OpenWrt x86/64 image, current Go Linux/amd64 test binary. No host KVM/device passthrough, privileged container, host-network bridge, SSH, credential or trust-store change.
 
-**Status:** Independently APPROVED round2 — [review record](../reviews/2026-10-15-openwrt-real-fw4-plan-review.md). Owner execution approval PENDING. No fw3/iptables or Tailscale implementation.
+**Status:** Independently APPROVED round2 — [plan review](../reviews/2026-10-15-openwrt-real-fw4-plan-review.md); owner then approved execution. The pinned firmware and signed prerequisites were verified, but the semantic invocation was interrupted with exit137 and no durable result. No generic-contract defect is confirmed and no compatibility claim is published. See [incomplete validation report](../reviews/2026-10-15-openwrt-real-fw4-validation.md). The disposable lab has been removed; a separately bounded checkpointed retry requires owner approval. No fw3/iptables or Tailscale implementation.
 
 ## Exact environment and claim
 
