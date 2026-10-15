@@ -8,7 +8,7 @@
 
 **Tech Stack:** Existing Go1.24/stdlib, `internal/netpolicy`, bounded local Linux reads; synthetic fixture tests. No dependency, SDK, daemon, remote transport or new privilege.
 
-**Status:** Independently APPROVED round3 — [review record](../reviews/2026-10-15-openwrt-gateway-plan-review.md). Owner approval REQUIRED and PENDING before implementation, test VM creation or live reads. Baseline `a4885e0` remains accepted and unchanged.
+**Status:** Independently APPROVED round3 — [review record](../reviews/2026-10-15-openwrt-gateway-plan-review.md). Owner implementation approval GRANTED for all four tasks under one writer. Work in progress; live/private-device access remains separately unauthorized. Baseline `a4885e0` remains accepted.
 
 ---
 

@@ -73,7 +73,9 @@ func validateObjects(objects []Object) error {
 	refs := map[string]bool{}
 	aliases := map[string]bool{}
 	endpoints := map[string]bool{}
-	for _, o := range objects {
+	for i, o := range objects {
+		objects[i] = cloneObject(o)
+		o = objects[i]
 		if !validObject(o) || !strings.HasPrefix(o.Ref.ID, "net_") || o.Ref.Revision == 0 || refs[o.Ref.ID] {
 			return ErrInvalid
 		}
@@ -161,7 +163,7 @@ func (r *Registry) Objects() ([]Object, error) { s, e := r.load(); return s.Obje
 func find(objects []Object, kind Kind, name string) (Object, error) {
 	for _, o := range objects {
 		if o.Kind == kind && (o.Alias == name || o.Ref.ID == name) {
-			return o, nil
+			return cloneObject(o), nil
 		}
 	}
 	return Object{}, ErrMissing
@@ -183,7 +185,7 @@ func (r *Registry) ResolveRef(ref Ref) (Object, error) {
 			if o.Ref != ref {
 				return Object{}, ErrStale
 			}
-			return o, nil
+			return cloneObject(o), nil
 		}
 	}
 	return Object{}, ErrMissing
@@ -208,6 +210,7 @@ func bindRefs(objects []Object, b *Binding) error {
 	return nil
 }
 func (r *Registry) Create(o Object) (Object, error) {
+	o = cloneObject(o)
 	var result Object
 	e := r.mutate(func(s *registryState) error {
 		if o.Ref.ID != "" || o.Ref.Revision != 0 {
@@ -218,7 +221,7 @@ func (r *Registry) Create(o Object) (Object, error) {
 			return e
 		}
 		s.Objects = append(s.Objects, o)
-		result = o
+		result = cloneObject(o)
 		return nil
 	})
 	return result, e
@@ -227,7 +230,7 @@ func (r *Registry) Rename(kind Kind, name, alias string) (Object, error) {
 	return r.change(kind, name, func(o *Object) { o.Alias = alias })
 }
 func (r *Registry) Rebind(kind Kind, name string, b Binding) (Object, error) {
-	return r.change(kind, name, func(o *Object) { o.Binding = b; o.Ref.Revision++ })
+	return r.change(kind, name, func(o *Object) { o.Binding = cloneBinding(b); o.Ref.Revision++ })
 }
 func (r *Registry) change(kind Kind, name string, fn func(*Object)) (Object, error) {
 	var result Object
@@ -238,7 +241,7 @@ func (r *Registry) change(kind Kind, name string, fn func(*Object)) (Object, err
 				if e := bindRefs(s.Objects, &s.Objects[i].Binding); e != nil {
 					return e
 				}
-				result = s.Objects[i]
+				result = cloneObject(s.Objects[i])
 				return nil
 			}
 		}

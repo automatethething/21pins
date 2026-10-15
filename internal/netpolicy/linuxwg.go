@@ -19,6 +19,7 @@ type Question struct {
 	Target, Source, Service, Gateway, VPN, Control Object
 	Resolved                                       []ResolvedTuple
 	Baseline                                       *Assessment
+	openwrtBound                                   *openWrtQuestion
 }
 type Collection struct {
 	Facts   []Fact

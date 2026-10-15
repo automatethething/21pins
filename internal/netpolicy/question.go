@@ -30,6 +30,12 @@ func (r *Registry) Question(operation, name, source string, baseline *Assessment
 	switch operation {
 	case "gateway":
 		q.Gateway = target
+		if target.Binding.OpenWrt != nil {
+			q.Source, e = resolve(target.Binding.Source)
+			if e != nil {
+				return q, e
+			}
+		}
 		q.Request.Required = Properties(operation, target.Binding)
 	case "vpn":
 		if target.Binding.Protocol != "wireguard" {
@@ -231,6 +237,7 @@ func (r *Registry) Question(operation, name, source string, baseline *Assessment
 		Nodes []node
 		Rules []Rule
 	}{nodes, rules})
+	sealOpenWrtQuestion(&q)
 	return q, nil
 }
 func appendUniqueRef(refs []Ref, ref Ref) []Ref {
