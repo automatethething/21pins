@@ -1,6 +1,6 @@
 # 21pins: public network policy and verification design
 
-Status: proposed product specification; independent design reviewer APPROVED after three bounded review rounds. Owner review pending before implementation planning. Documentation only. None of the commands or adapters proposed here is represented as shipped.
+Status: independent design reviewer APPROVED; owner APPROVED implementation planning on2026-10-14 with the privacy clarification and adapter sequencing below. Implementation plan requires separate owner approval before execution. Documentation only; proposed commands/adapters are not shipped.
 
 ## 1. Product primitive and boundaries
 
@@ -73,7 +73,7 @@ Friendly names are suggested locally, operator-confirmed and distinct from ident
 21pins inspect tailscale personal-tailnet
 ```
 
-`vpn` stays the stable entry point. Protocol inspection aliases resolve the SAME VPN object and delegate to its matching adapter; an implementation mismatch is a clear error, never an implicit rebind or different target. `--details` reveals safe capability/protocol detail; it does not expose credentials, MACs, public/WAN addresses, raw interfaces/marks/table numbers, raw configuration or unfiltered logs. A separately scoped technical diagnostic may use minimized native details locally if genuinely required; it is not the default product output.
+`vpn` stays the stable entry point. Protocol inspection aliases resolve the SAME VPN object and delegate to its matching adapter; an implementation mismatch is a clear error, never an implicit rebind or different target. `--details` reveals safe capability/protocol detail; it does not expose credentials, keys/tokens, MACs, customer/home WAN addresses, private/internal/tailnet addresses, unrelated topology, raw interfaces/marks/table numbers, raw configuration or unfiltered logs. An intentionally public infrastructure endpoint may be displayed ONLY when it is itself the explicitly inspected public resource, under the contextual disclosure rule in§9; routability or `--details` alone never establishes that exception. A separately scoped technical diagnostic may use minimized native details locally if genuinely required; it is not the default product output.
 
 `verify access private-dns` resolves the current registered source/actor context and matching policy declaration(s), one applicable revision per requested tuple. If source identity is ambiguous/unavailable, return UNVERIFIED with an explicit source-selection requirement; do not infer trusted/guest from a name, failed connection or SSID alone. Proposed explicit form: `21pins verify access private-dns --from trusted`. Network source declarations and independently supported membership evidence must both be recorded; an explicit argument is not by itself proof of membership.
 
@@ -89,7 +89,7 @@ Human output leads with friendly source, service, expected path and result/missi
 
 ## 4. Discovery: suggestion, not reconnaissance or authority
 
-Default discovery is passive, local and bounded: read only already-authorized, minimized metadata from enrolled native clients/registrations and specifically scoped read-only gateway channels. If a channel/client is not enrolled/authorized, report that limitation; do not initiate login, read credentials, connect to unknown routers, scan LAN ports, inventory every device, request MACs/public IPs or change trust. Native credentials remain in native custody; use their authorized interfaces, never scrape keys/cookies/profile secrets into 21pins.
+Default discovery is passive, local and bounded: read only already-authorized, minimized metadata from enrolled native clients/registrations and specifically scoped read-only gateway channels. If a channel/client is not enrolled/authorized, report that limitation; do not initiate login, read credentials, connect to unknown routers, scan LAN ports, inventory every device, request MACs/customer WAN addresses or change trust. Public resource classification does not allow discovery to emit unrelated public endpoints. Native credentials remain in native custody; use their authorized interfaces, never scrape keys/cookies/profile secrets into 21pins.
 
 Suggest objects/names such as home-router, private-network, trusted, guest and private-dns from non-sensitive role/capability facts. A detected client is only a candidate implementation, not proof of connectivity, gateway support, protected-path ownership or service reachability. Discovery does not register automatically, overwrite an existing binding or authorize probes. Reconcile suggestions by local IDs; unresolved duplicates require confirmation.
 
@@ -102,8 +102,8 @@ Separate platform and VPN dimensions:
 | Gateway adapter | Platform-specific responsibility | Product commitment |
 |---|---|---|
 | Generic Linux | Effective routes/policy rules, interface/network binding, firewall evidence when available, native service state | Initial reusable read-only target; platform/version/permissions still tested. |
-| OpenWrt | UCI-to-effective kernel/netifd/firewall translation, logical-network mapping and routing/firewall order | Initial platform-specific candidate; config alone is not universally effective-policy proof. |
-| GL.iNet | OpenWrt base plus generated VPN route policy, source selectors, destination sets, killswitch/leak guards and managed forwarding interpretation | Extension of OpenWrt semantics, not a parallel public object model. |
+| OpenWrt | UCI-to-effective kernel/netifd/firewall translation, logical-network mapping and routing/firewall order | NEXT adapter increment after the generic Linux/WireGuard/DNS slice; config alone is not effective-policy proof. |
+| GL.iNet | OpenWrt base plus generated VPN route policy, source selectors, destination sets, killswitch/leak guards and managed forwarding interpretation | NEXT increment alongside OpenWrt, using existing dogfood evidence/fixtures; no GL-specific types in the generic core. |
 | UniFi | Authorized controller/API interpretation and evidence of effective device policy | Roadmap, not implemented support. |
 | OPNsense | Versioned native routing/firewall/controller evidence | Roadmap, not implemented support. |
 | MikroTik | Versioned native routing/firewall/controller evidence | Roadmap, not implemented support. |
@@ -111,7 +111,7 @@ Separate platform and VPN dimensions:
 | VPN adapter | Common model projection | Product commitment |
 |---|---|---|
 | WireGuard | Session freshness, fixed peer/endpoint binding, allowed-destination/route evidence, protected-path observations | First extraction target from existing native work; no public peer-enrollment mutation in this slice. |
-| Tailscale | Device/tailnet identity, supported route/access-policy evidence and path observations | Second adapter target; do not equate online/device status with ACL enforcement or treat its routes/SSH as WireGuard semantics. |
+| Tailscale | Device/tailnet identity, supported route/access-policy evidence and path observations | SUBSEQUENT cross-model validation target after the OpenWrt/GL.iNet increment; do not equate online status with ACL enforcement or force WireGuard semantics. |
 | OpenVPN | Future status/client/route/path evidence | Deferred. |
 | Others | Add only after native evidence contracts and representative fixtures exist | Deferred. |
 
@@ -196,7 +196,11 @@ Existing domain-specific CLI/helper experiments remain historical/internal extra
 
 ## 9. Privacy, safety and records
 
-Collect minimum facts before invoking an adapter; filter at source, not after raw outputs reach the model. No raw packet dumps, unrelated traffic/history, provider credentials, peer/private keys, auth cookies, hardware identifiers, public/WAN IPs or unreviewed screenshots in model calls, discovery/default output, telemetry or review artifacts. Detail inspection is not a privacy bypass. Protected topology is kept local only when required for binding/verification.
+Privacy is contextual, not a claim that every Internet-routable address is inherently secret. Customer/home WAN addresses and non-public topology are protected by default. Private/internal/tailnet addresses, non-public infrastructure, credentials, keys, tokens, cookies and identifying hardware data remain protected. Unknown provenance/classification is protected, not presumed public.
+
+An intentionally public infrastructure endpoint may be displayed when that endpoint is ITSELF the explicitly inspected public resource and doing so reveals no unrelated protected topology. Require an operator-confirmed public-resource classification bound to the exact immutable endpoint/revision and explicit inspection context. A routable address, public DNS record, adapter hint, caller-supplied payload flag or `--details` is insufficient. This exception does not declassify a related customer's home WAN, private/tailnet addresses, peer inventory, internal routes or adjacent endpoints merely because they are associated with that public resource. Changing the binding invalidates prior disclosure approval. Public designation never overrides intrinsically protected credential/key/token or private-address classes.
+
+Collect minimum facts before invoking an adapter; filter at source, not after raw outputs reach the model. No raw packet dumps, unrelated traffic/history, protected addresses/topology, credentials, keys, auth cookies, hardware identifiers or unreviewed screenshots in default output, model calls, telemetry or review artifacts. Display of one explicitly selected public resource does not authorize bulk collection/export, telemetry, external-model transmission or revealing related protected resources. Detail inspection is not a privacy bypass. Necessary protected topology stays local to binding/verification.
 
 Reuse hardened local metadata patterns (atomic writes, restrictive permissions, symlink refusal, one writer). No new cloud control plane or database. Persistent verification records contain minimal normalized refs/scope/property outcomes/provenance/observed times and applicable policy binding, not packet bodies/raw logs. Define retention/cleanup in the approved slice plan; do not silently retain raw captures. Synthetic nonces are temporary correlation values, not credentials. Cleanup failure/stale snapshots are visible.
 
@@ -204,7 +208,7 @@ Discovery/inspection/verification never broadens immutable host roles, credentia
 
 ## 10. Initial extraction slice and acceptance gates
 
-This is an architecture spec, not a plan to implement six gateway vendors and three VPN stacks at once. Proposed first planning slice: object identity/policy/verdict contract, passive enrolled-resource suggestions, normalized read-only Linux/WireGuard and OpenWrt/GL.iNet witnesses using isolated fixtures, then one portable DNS access/isolation flow. Tailscale is the second adapter validation target; other listed platforms/protocols remain roadmap until tested.
+The SMALL first slice establishes, in order: immutable registry/friendly aliases; policy/access; normalized capabilities/evidence; verdict engine/receipts; passive bounded discovery; generic Linux + WireGuard read-only evidence; DNS access/isolation; the minimum CLI for that end-to-end path. OpenWrt/GL.iNet is the NEXT adapter increment using existing evidence/fixtures, not a source of core-specific types. Tailscale is the SUBSEQUENT cross-model validation target for distinct device/tailnet/ACL semantics. UniFi, OPNsense, MikroTik, OpenVPN and a plugin SDK are excluded from this slice.
 
 Before declaring commands/support shipped, require:
 - identical user-facing VPN/access/isolation semantics across representative implementations or explicit capability limitations;
@@ -218,4 +222,4 @@ Before declaring commands/support shipped, require:
 - no changes to existing LLM proxy/grant/native SSH command contracts or production trust;
 - public examples and fixtures use generic synthetic resources only, with no deployment-specific nouns, identities or addresses.
 
-Implementation planning begins only after independent design review and owner review. Review approval is not authority to implement, publish, deploy or enable management/probe access.
+Owner review has authorized planning with these constraints. The implementation plan must pass independent review and receive owner approval before execution. Neither design nor plan review authorizes publication, deployment, new trust or expanded management/probe access.

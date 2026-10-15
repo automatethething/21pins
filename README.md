@@ -53,7 +53,7 @@ This distinction is intentional: future agents should say “Anthropic/Claude”
 
 ## Proposed network policy verification (design only)
 
-The [public product design](docs/superpowers/specs/2026-10-14-network-policy-verification-design.md) centers on **gateway, network, vpn, service, policy/access and verification**: who should reach what, through which protected path, and whether observed behavior matches intent. `vpn` is the stable abstraction over WireGuard, Tailscale and future adapters. Friendly discovery/inspection and scoped verification are proposed—not shipped commands or blanket vendor-support claims. Network gateways are distinct from the existing LLM proxy. No implementation or infrastructure change is included in this specification.
+The [public product design](docs/superpowers/specs/2026-10-14-network-policy-verification-design.md) centers on **gateway, network, vpn, service, policy/access and verification**: who should reach what, through which protected path, and whether observed behavior matches intent. `vpn` is the stable abstraction over WireGuard, Tailscale and future adapters. Friendly discovery/inspection and scoped verification are proposed—not shipped commands or blanket vendor-support claims. Network gateways are distinct from the existing LLM proxy. No implementation or infrastructure change is included in this specification. The [Linux/WireGuard/DNS-first implementation plan](docs/superpowers/plans/2026-10-14-network-policy-first-slice.md) is awaiting owner approval before execution; OpenWrt/GL.iNet comes next, then Tailscale cross-model validation.
 
 ## Temporary SSH access (opt-in V1)
 
