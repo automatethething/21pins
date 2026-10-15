@@ -15,8 +15,9 @@ const maxStateBytes = 16 << 20
 
 // ponytail: one atomic JSON snapshot; no database or mutable graph service.
 type registryState struct {
-	Schema  int      `json:"schema"`
-	Objects []Object `json:"objects"`
+	Schema   int      `json:"schema"`
+	Objects  []Object `json:"objects"`
+	Policies []Rule   `json:"policies,omitempty"`
 }
 type Registry struct{ Path string }
 
@@ -28,7 +29,7 @@ func readSafe(path string, dst any) error {
 	if e != nil {
 		return e
 	}
-	if !before.Mode().IsRegular() || before.Mode().Perm() != 0600 || before.Size() > maxStateBytes {
+	if !before.Mode().IsRegular() || before.Mode().Perm() != 0600 || !ownedFile(before) || before.Size() > maxStateBytes {
 		return ErrUnsafe
 	}
 	f, e := os.Open(path)
@@ -247,7 +248,8 @@ func (r *Registry) change(kind Kind, name string, fn func(*Object)) (Object, err
 }
 func (r *Registry) Import(reader io.Reader) error {
 	var input struct {
-		Objects []Object `json:"objects"`
+		Objects  []Object `json:"objects"`
+		Policies []Rule   `json:"policies"`
 	}
 	d := json.NewDecoder(io.LimitReader(reader, maxStateBytes))
 	d.DisallowUnknownFields()
@@ -269,6 +271,11 @@ func (r *Registry) Import(reader io.Reader) error {
 		}
 		for i := start; i < len(s.Objects); i++ {
 			if e := bindRefs(s.Objects, &s.Objects[i].Binding); e != nil {
+				return e
+			}
+		}
+		for _, rule := range input.Policies {
+			if _, e := putRule(s, rule); e != nil {
 				return e
 			}
 		}

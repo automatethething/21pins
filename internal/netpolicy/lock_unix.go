@@ -7,6 +7,11 @@ import (
 	"syscall"
 )
 
+func ownedFile(info os.FileInfo) bool {
+	st, ok := info.Sys().(*syscall.Stat_t)
+	return ok && st.Uid == uint32(os.Geteuid())
+}
+
 func lockFile(path string) (func(), error) {
 	if info, e := os.Lstat(path); e == nil && (!info.Mode().IsRegular() || info.Mode().Perm() != 0600) {
 		return nil, ErrUnsafe
