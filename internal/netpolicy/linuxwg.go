@@ -22,9 +22,10 @@ type Question struct {
 	openwrtBound                                   *openWrtQuestion
 }
 type Collection struct {
-	Facts   []Fact
-	Cleanup bool
-	Missing []string
+	Facts        []Fact
+	Cleanup      bool
+	Missing      []string
+	Capabilities []Capability
 }
 type nativeRun func(context.Context, string, string, ...string) ([]byte, error)
 type collector struct {
@@ -45,10 +46,15 @@ func CollectNative(ctx context.Context, q Question, permit func(context.Context,
 type boundedOutput struct {
 	bytes.Buffer
 	overflow bool
+	limit    int
 }
 
 func (b *boundedOutput) Write(p []byte) (int, error) {
-	if b.Len()+len(p) > 1<<20 {
+	limit := b.limit
+	if limit == 0 {
+		limit = 1 << 20
+	}
+	if b.Len()+len(p) > limit {
 		b.overflow = true
 		return 0, ErrUnsupported
 	}
@@ -58,7 +64,7 @@ func runNative(parent context.Context, namespace, tool string, args ...string) (
 	if runtime.GOOS != "linux" {
 		return nil, ErrUnsupported
 	}
-	if tool != "ip" && tool != "wg" && tool != "nft" {
+	if tool != "ip" && tool != "wg" && tool != "nft" && tool != "ubus" && tool != "uci" {
 		return nil, ErrInvalid
 	}
 	// Execute only after the caller entered the verified namespace FD; never reopen an alias in ip netns exec.
@@ -70,6 +76,9 @@ func runNative(parent context.Context, namespace, tool string, args ...string) (
 	cmd := exec.CommandContext(ctx, tool, args...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C"}
 	var out boundedOutput
+	if limit, ok := parent.Value(nativeOutputLimit{}).(int); ok && limit > 0 && limit <= 1<<20 {
+		out.limit = limit
+	}
 	cmd.Stdout = &out
 	cmd.Stderr = io.Discard
 	if cmd.Run() != nil || out.overflow {
@@ -81,6 +90,9 @@ func (c *collector) read(ctx context.Context, b Binding, tool string, args ...st
 	if c.permit == nil || c.permit(ctx, "network.read") != nil {
 		return nil, ErrMissing
 	}
+	return c.readNamespace(ctx, b, tool, args...)
+}
+func (c *collector) readNamespace(ctx context.Context, b Binding, tool string, args ...string) ([]byte, error) {
 	id, e := namespaceIdentity(b.Namespace)
 	if e != nil || b.Context == "" || id != b.Context {
 		return nil, ErrStale
@@ -375,6 +387,15 @@ func (c *collector) collect(ctx context.Context, q Question) Collection {
 	if c.permit == nil || c.permit(ctx, "network.read") != nil {
 		result.Missing = []string{"network.read"}
 		return result
+	}
+	frozen, e := freezeOpenWrtQuestion(q)
+	if e != nil {
+		result.Missing = []string{"openwrt_frozen_scope"}
+		return result
+	}
+	q = frozen
+	if q.Gateway.Binding.OpenWrt != nil {
+		return c.collectOpenWrt(ctx, q)
 	}
 	switch q.Request.Operation {
 	case "access", "isolation":

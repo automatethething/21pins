@@ -1,6 +1,7 @@
 package netpolicy
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -178,6 +179,146 @@ func TestOpenWrtNormalizeScopeAndReachability(t *testing.T) {
 	s.stored["home_to_uplink.enabled"] = "1"
 	if openWrtRuntimeDigest(s) != d || !normalizeOpenWrt(q, s).guardCandidate {
 		t.Fatal("stored configuration became runtime authority")
+	}
+}
+
+func owFixtureRead(q Question, s openWrtSnapshot, calls *int) func(context.Context, Binding, string, ...string) ([]byte, error) {
+	return func(ctx context.Context, b Binding, tool string, args ...string) ([]byte, error) {
+		*calls++
+		if b.Context != q.Gateway.Binding.Context {
+			return nil, ErrStale
+		}
+		switch tool {
+		case "ubus":
+			return s.logical, nil
+		case "uci":
+			if strings.HasSuffix(args[len(args)-1], ".device") {
+				return []byte("edge0"), nil
+			}
+			return []byte("0"), nil
+		case "ip":
+			if args[2] == "rule" {
+				return s.rules, nil
+			}
+			return s.route, nil
+		case "nft":
+			for _, a := range args {
+				if a == "get" {
+					set := q.Gateway.Binding.OpenWrt.DestinationSet
+					return owJSON(map[string]any{"nftables": []any{map[string]any{"element": map[string]any{"family": set.Family, "table": set.Table, "name": set.Name, "elem": []string{q.Gateway.Binding.Target}}}}}), nil
+				}
+			}
+			for _, c := range q.Gateway.Binding.OpenWrt.Chains {
+				if args[len(args)-1] == c.Chain {
+					return s.chains[openWrtChainKey(c)], nil
+				}
+			}
+			return s.set, nil
+		}
+		return nil, ErrUnsupported
+	}
+}
+func TestOpenWrtReadCanceledResultCannotBecomeEvidence(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	session := owReadSession{ctx: ctx, permit: func(context.Context, string) error { return nil }, read: func(context.Context, Binding, string, ...string) ([]byte, error) { cancel(); return []byte(`{}`), nil }}
+	if _, e := session.call("ubus", "call", "network.interface.home", "status"); e == nil {
+		t.Fatal("canceled native result accepted")
+	}
+}
+func TestOpenWrtReadBoundary(t *testing.T) {
+	q, s := owFixture()
+	sealOpenWrtQuestion(&q)
+	calls, permits := 0, 0
+	read := owFixtureRead(q, s, &calls)
+	permit := func(context.Context, string) error { permits++; return nil }
+	snap, e := readOpenWrtSnapshot(context.Background(), q, permit, read)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if snap.runtime {
+		t.Fatal("injectable reader helper minted runtime seal")
+	}
+	if permits != calls || calls > 32 || calls < 10 {
+		t.Fatal("read admission/count bounds")
+	}
+	if n := normalizeOpenWrt(q, snap); !n.markKnown || !n.routeSelected {
+		t.Fatal("fixed reads failed to normalize", n.missing)
+	}
+	calls = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, func(context.Context, string) error { return ErrMissing }, read)
+	if e == nil || calls != 0 {
+		t.Fatal("native read before admission")
+	}
+	calls = 0
+	permits = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, func(context.Context, string) error {
+		permits++
+		if permits == 3 {
+			return ErrMissing
+		}
+		return nil
+	}, read)
+	if e == nil || calls != 2 {
+		t.Fatal("revocation did not stop subsequent reads")
+	}
+	calls = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, func(context.Context, Binding, string, ...string) ([]byte, error) {
+		calls++
+		return make([]byte, 65537), nil
+	})
+	if e == nil || calls != 1 {
+		t.Fatal("oversized native output not bounded")
+	}
+	q, s = owFixture()
+	sealOpenWrtQuestion(&q)
+	calls = 0
+	beforeMutation, _ := freezeOpenWrtQuestion(q)
+	original := beforeMutation.Gateway.Binding.OpenWrt.Chains[0].Chain
+	q.Gateway.Binding.OpenWrt.Chains[0].Chain = "caller_changed"
+	fixed, _ := freezeOpenWrtQuestion(q)
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, owFixtureRead(fixed, s, &calls))
+	if e != nil || fixed.Gateway.Binding.OpenWrt.Chains[0].Chain != original {
+		t.Fatal("caller mutation altered admitted reads", e)
+	}
+	q, s = owFixture()
+	sealOpenWrtQuestion(&q)
+	calls = 0
+	read = owFixtureRead(q, s, &calls)
+	changed := false
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, func(c context.Context, b Binding, tool string, args ...string) ([]byte, error) {
+		if calls > 8 && !changed && tool == "ip" && args[2] == "route" {
+			changed = true
+			calls++
+			return owJSON([]any{map[string]any{"dev": "changed", "table": 100}}), nil
+		}
+		return read(c, b, tool, args...)
+	})
+	if e == nil {
+		t.Fatal("mixed runtime samples accepted")
+	}
+	q, s = owFixture()
+	q.Gateway.Binding.OpenWrt.StoredSections = []string{"one", "two", "three", "four", "five", "six", "seven", "eight"}
+	sealOpenWrtQuestion(&q)
+	calls = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, owFixtureRead(q, s, &calls))
+	if e == nil || calls != 0 {
+		t.Fatal("oversized read plan not rejected before execution")
+	}
+	q, s = owFixture()
+	sealOpenWrtQuestion(&q)
+	q.Request.MetadataDigest = "substituted"
+	calls = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, owFixtureRead(q, s, &calls))
+	if e == nil || calls != 0 {
+		t.Fatal("substituted digest read native state")
+	}
+	q, s = owFixture()
+	q.Gateway.Binding.OpenWrt.Profile = "fw3"
+	sealOpenWrtQuestion(&q)
+	calls = 0
+	_, e = readOpenWrtSnapshot(context.Background(), q, permit, owFixtureRead(q, s, &calls))
+	if e == nil || calls != 0 {
+		t.Fatal("unsupported backend collected as supported")
 	}
 }
 

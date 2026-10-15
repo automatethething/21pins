@@ -157,14 +157,18 @@ type openWrtSnapshot struct {
 	runtime, synthetic, closed bool
 }
 type openWrtEvidence struct {
-	logical, sourceLogical, markKnown, routeSelected, vpnSelected, guardCandidate, coverage, runtime, synthetic bool
-	mark                                                                                                        uint32
-	forwarding                                                                                                  *bool
-	runtimeDigest, storedDigest                                                                                 string
-	missing                                                                                                     []string
+	logical, sourceLogical, markKnown, routeSelected, vpnSelected, guardCandidate, coverage, runtime, synthetic, scopeSupported bool
+	mark                                                                                                                        uint32
+	forwarding                                                                                                                  *bool
+	runtimeDigest, storedDigest                                                                                                 string
+	missing                                                                                                                     []string
 }
 
 func openWrtScope(q Question) string {
+	q.Gateway = cloneObject(q.Gateway)
+	q.Source = cloneObject(q.Source)
+	q.Service = cloneObject(q.Service)
+	q.VPN = cloneObject(q.VPN)
 	q.Gateway.Alias = ""
 	q.Source.Alias = ""
 	q.Service.Alias = ""
@@ -797,6 +801,7 @@ func normalizeOpenWrt(q Question, s openWrtSnapshot) openWrtEvidence {
 	if forwardSeen && supported {
 		n.forwarding = owBool(forwardAllowed)
 	}
+	n.scopeSupported = supported
 	n.coverage = s.closed && supported && n.markKnown && n.routeSelected
 	if !supported {
 		n.missing = append(n.missing, "openwrt_unsupported_or_unreachable_policy")
