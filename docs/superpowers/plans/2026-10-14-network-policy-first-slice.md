@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (single writer) or superpowers:subagent-driven-development only when separately authorized. Steps use checkbox syntax. **Owner APPROVED execution with the two clarifications below. One writer; real isolated Linux/WireGuard/DNS integration remains the completion gate.**
 
-**Status:** Independent fresh-context review APPROVED in round2; [review record](../reviews/2026-10-14-network-policy-first-slice-plan-review.md). Owner execution approval GRANTED with bounded disclosure/profile clarifications before Task1.
+**Status:** IMPLEMENTED / VERIFIED across all eight tasks. Owner execution approval GRANTED with bounded disclosure/profile clarifications before Task1. Real isolated Linux/WireGuard/DNS integration (including race detector) and full regressions PASS. [Implementation review / evidence](../reviews/2026-10-14-network-policy-first-slice-implementation-review.md); [original plan review](../reviews/2026-10-14-network-policy-first-slice-plan-review.md). No publication/deployment or later adapters.
 
 **Goal:** Establish the generic product contracts, then exercise one registered Linux/WireGuard protected DNS allow/deny path with minimal discover/inspect/verify commands.
 
@@ -20,7 +20,7 @@ Build these eight steps in order, not parallel platform work. First release supp
 
 Next increment: OpenWrt/GL.iNet adapters using existing dogfood lessons and **sanitized** fixtures, without changing the generic core into UCI/mark-specific types. Subsequent increment: Tailscale device/tailnet/ACL cross-model validation. No UniFi, OPNsense, MikroTik, OpenVPN, plugin SDK or public infrastructure-specific commands in this plan.
 
-### Files / seams (planned; create none until approval)
+### Files / seams (approved and implemented)
 
 | Files | Responsibility |
 |---|---|
@@ -152,6 +152,23 @@ Pin exact property-set equality in unit and CLI tests, including optional requir
 - [ ] Run `go test ./cmd/21pins -run TestNetwork -count=1` (initial RED, then PASS); add a real isolated Linux namespace fixture with synthetic keys/resources, DNS responders, trusted/guest sources, protected WireGuard path, simple supported effective policy/guard and source-bound observers. The fixture coordinator binds the entire fresh namespace graph and records controlled/synthetic closure; that provenance is accepted ONLY for the test namespace, never shared production namespaces. Prove metadata import→discover/inspect→request/admitted verify→receipt for both allowed and isolated cases; inject a real leak for VIOLATED and remove witness/tool/permission for UNVERIFIED. No existing host interface, sysctl, firewall, VPN, credentials or production data may change; cleanup every fixture resource.
 - [ ] Run `go test -tags=netpolicy_integration ./internal/netpolicy -run TestLinuxWGDNSE2E -count=1` only on an already-authorized isolated Linux runner with required tools/CAP_NET_ADMIN. Missing prerequisites must clearly SKIP and cannot count as the release gate passing. A fixture receipt is labeled synthetic/test; never claim it verified a real customer network.
 - [ ] Final gate: `go test ./...`, `go test -race ./internal/netpolicy ./cmd/21pins`, `go vet ./...`, Linux end-to-end PASS with observed cleanup, `git diff --check`. Confirm no existing provider/grant/receipt/SSH contract or owned infrastructure changed. Publish no support claim before the real isolated gate passes. Commit only slice files/docs; preserve unrelated website edits.
+
+## Execution record
+
+The original checklists below each task are retained as the approved procedure, not a pending approval queue. Execution status is recorded here:
+
+| Task | Result | Commit / evidence |
+| --- | --- | --- |
+| 1 Registry / aliases | PASS | `49d62b1` |
+| 2 Policy / existing-grant admission | PASS | `2f4b7f0`, final scope regressions |
+| 3 Evidence / disclosure suppression | PASS | `2e9569d`, final provenance regressions |
+| 4 Verdicts / separate receipts | PASS | `5d98e0d`, persistence/retention checks |
+| 5 Passive discovery | PASS | `7c1d8ba` |
+| 6 Linux / WireGuard facts | PASS | `316fb49`, final native/session/order hardening |
+| 7 DNS / bounded observers | PASS | `cc6c2b2`, actual kernel nonce-filter/cleanup checks |
+| 8 CLI / real integration | PASS | final slice commit; full Go/race/vet, Node/Pi, cross-build and real isolated Linux gate |
+
+No open implementation item or owner re-approval remains within this slice. The first slice does not authorize deployment, new trust or later adapters.
 
 ## Review / owner handoff
 

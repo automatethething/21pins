@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/netip"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -59,17 +60,14 @@ func runNative(parent context.Context, namespace, tool string, args ...string) (
 	if tool != "ip" && tool != "wg" && tool != "nft" {
 		return nil, ErrInvalid
 	}
-	if namespace != "" && !nativePattern.MatchString(namespace) {
+	// Execute only after the caller entered the verified namespace FD; never reopen an alias in ip netns exec.
+	if namespace != "" {
 		return nil, ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
-	command := tool
-	if namespace != "" {
-		args = append([]string{"netns", "exec", namespace, tool}, args...)
-		command = "ip"
-	}
-	cmd := exec.CommandContext(ctx, command, args...)
+	cmd := exec.CommandContext(ctx, tool, args...)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C"}
 	var out boundedOutput
 	cmd.Stdout = &out
 	cmd.Stderr = io.Discard
@@ -86,7 +84,8 @@ func (c *collector) read(ctx context.Context, b Binding, tool string, args ...st
 	if e != nil || b.Context == "" || id != b.Context {
 		return nil, ErrStale
 	}
-	out, e := c.run(ctx, b.Namespace, tool, args...)
+	var out []byte
+	e = withinNamespace(ctx, b, func() error { var runErr error; out, runErr = c.run(ctx, "", tool, args...); return runErr })
 	if e != nil {
 		return nil, e
 	}
@@ -105,6 +104,15 @@ func (c *collector) assurance() string {
 func (c *collector) fact(property string, q Question, tuple *Tuple, value bool) Fact {
 	return newFact(property, q.Request, tuple, value, time.Now().UTC(), c.assurance())
 }
+func (c *collector) sessionFact(q Question, at, now time.Time) Fact {
+	fresh := at.Unix() > 0 && !at.After(now) && now.Sub(at) <= 180*time.Second
+	f := newFact("vpn.session_freshness", q.Request, nil, fresh, now, c.assurance())
+	if fresh {
+		f.ValidUntil = at.Add(180 * time.Second)
+	}
+	return f
+}
+
 func interfaceMatches(data []byte, address string) bool {
 	for _, f := range strings.Fields(string(data)) {
 		if prefix, e := netip.ParsePrefix(f); e == nil && prefix.Addr().String() == address {
@@ -181,6 +189,7 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 		return p
 	}
 	chain := false
+	terminated := map[string]bool{}
 	for _, entry := range body.Entries {
 		if rawChain, ok := entry["chain"]; ok {
 			chain = true
@@ -207,6 +216,7 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 		var mark uint32
 		markSet, deny, accept := false, false, false
 		known := true
+		selectors := map[string]bool{}
 		for _, expr := range rule.Expr {
 			if len(expr) != 1 {
 				known = false
@@ -224,6 +234,9 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 						Right string `json:"right"`
 					}
 					if json.Unmarshal(v, &m) == nil && m.Op == "!=" && m.Left.Meta.Key == "oifname" && nativePattern.MatchString(m.Right) {
+						if guardInterface != "" {
+							known = false
+						}
 						guardInterface = m.Right
 						continue
 					}
@@ -231,6 +244,10 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 						known = false
 						continue
 					}
+					if selectors[m.Left.Payload.Field] {
+						known = false
+					}
+					selectors[m.Left.Payload.Field] = true
 					if m.Left.Payload.Field == "saddr" {
 						source = m.Right
 					} else if m.Left.Payload.Field == "daddr" {
@@ -265,10 +282,21 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 			p.supported = false
 			continue
 		}
+		if destination == "" && (deny || accept || markSet) {
+			p.supported = false
+			continue
+		}
 		if destination != target {
 			continue
 		}
 		if source == "" {
+			p.supported = false
+			continue
+		}
+		if terminated[source] {
+			continue
+		}
+		if (deny && accept) || (guardInterface != "" && (!deny || markSet)) {
 			p.supported = false
 			continue
 		}
@@ -277,9 +305,11 @@ func normalizeNFT(raw []byte, target string) nftPolicy {
 				p.guards[source] = guardInterface
 			} else {
 				p.denied[source] = true
+				terminated[source] = true
 			}
 		}
 		if accept {
+			terminated[source] = true
 			p.forwarded[source] = true
 		}
 		if markSet {
@@ -383,8 +413,8 @@ func (c *collector) collect(ctx context.Context, q Question) Collection {
 		raw, e = c.read(ctx, q.Target.Binding, "wg", "show", q.Target.Binding.Interface, "latest-handshakes")
 		if e == nil {
 			at, ok := peerHandshake(raw, q.Target.Binding.Peer)
-			if ok && !at.After(time.Now().Add(2*time.Second)) {
-				result.Facts = append(result.Facts, c.fact("vpn.session_freshness", q, nil, at.Unix() > 0 && time.Since(at) <= 180*time.Second))
+			if ok && !at.After(time.Now()) {
+				result.Facts = append(result.Facts, c.sessionFact(q, at, time.Now().UTC()))
 			}
 		}
 		owner := q.Target

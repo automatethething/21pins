@@ -26,6 +26,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Network metadata/verification never initializes the LLM provider/signing store.
+	switch os.Args[1] {
+	case "registry", "discover", "inspect", "verify":
+		os.Exit(handleNetwork(os.Args[1:]))
+	}
+
 	// Privileged pinned helper must never initialize unrelated issuer/provider state.
 	if os.Args[1] == "dns-admin" || os.Args[1] == "wg-beryl" {
 		var r dnsadmin.Result
@@ -88,6 +94,10 @@ func usage() {
 	fmt.Print(`21pins - local LLM key and gateway CLI
 
 Commands:
+  discover
+  inspect <gateway|network|vpn|service|policy> <name> [--details]
+  verify <gateway|vpn|access|isolation> ... [--request | --grant ID]
+  registry import <local-manifest.json>
   init
   status
   key providers

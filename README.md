@@ -51,9 +51,11 @@ Use provider names for credentials and routing namespaces; do not invent provide
 
 This distinction is intentional: future agents should say “Anthropic/Claude” or “OpenAI/Codex” when describing ownership, while preserving the canonical 21pins provider IDs (`anthropic` and `openai`).
 
-## Proposed network policy verification (design only)
+## Network policy verification — local first slice
 
-The [public product design](docs/superpowers/specs/2026-10-14-network-policy-verification-design.md) centers on **gateway, network, vpn, service, policy/access and verification**: who should reach what, through which protected path, and whether observed behavior matches intent. `vpn` is the stable abstraction over WireGuard, Tailscale and future adapters. Friendly discovery/inspection and scoped verification are proposed—not shipped commands or blanket vendor-support claims. Network gateways are distinct from the existing LLM proxy. No implementation or infrastructure change is included in this specification. The [Linux/WireGuard/DNS-first implementation plan](docs/superpowers/plans/2026-10-14-network-policy-first-slice.md) is awaiting owner approval before execution; OpenWrt/GL.iNet comes next, then Tailscale cross-model validation.
+The owner-approved [eight-task plan](docs/superpowers/plans/2026-10-14-network-policy-first-slice.md) now has an additive local implementation: immutable friendly objects, finite policy/access scopes, normalized evidence, separate assessment records, passive discovery and admitted Linux/WireGuard/DNS verification. See [commands, exact gateway/VPN profiles, privacy and limitations](docs/network-verification.md).
+
+`vpn` remains canonical; WireGuard is an expert view of that object. All endpoint display is suppressed: no public-confirmation flag/state ships. Gateway/VPN success never implies attached-policy compliance or universal network health. Unknown shared-policy override coverage remains UNVERIFIED; controlled synthetic integration does not certify customer networks. The real isolated Linux/WireGuard/DNS gate passes allow/isolation, an injected leak and missing evidence/tool/permission cases. No deployment, existing infrastructure, native SSH, LLM proxy, legacy grant/receipt semantics or later adapters changed. OpenWrt/GL.iNet and Tailscale remain unimplemented.
 
 ## Temporary SSH access (opt-in V1)
 

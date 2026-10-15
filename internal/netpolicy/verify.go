@@ -26,17 +26,25 @@ type PropertyResult struct {
 	Evidence  []string `json:"evidence_refs,omitempty"`
 	Assurance []string `json:"assurance,omitempty"`
 }
+type DisplayContext struct {
+	Source string `json:"source,omitempty"`
+	Target string `json:"target"`
+	VPN    string `json:"registered_vpn,omitempty"`
+}
+
 type Assessment struct {
-	ID         string             `json:"verification_id"`
-	Verdict    Verdict            `json:"verdict"`
-	Request    ObservationRequest `json:"request"`
-	Properties []PropertyResult   `json:"properties"`
-	Missing    []string           `json:"missing,omitempty"`
-	Excluded   []string           `json:"excluded"`
-	Evidence   []Fact             `json:"evidence"`
-	CreatedAt  time.Time          `json:"created_at"`
-	Cleanup    bool               `json:"cleanup"`
-	Synthetic  bool               `json:"synthetic"`
+	ID               string             `json:"verification_id"`
+	Context          DisplayContext     `json:"context"`
+	ExecutionGrantID string             `json:"execution_grant_id,omitempty"`
+	Verdict          Verdict            `json:"verdict"`
+	Request          ObservationRequest `json:"request"`
+	Properties       []PropertyResult   `json:"properties"`
+	Missing          []string           `json:"missing,omitempty"`
+	Excluded         []string           `json:"excluded"`
+	Evidence         []Fact             `json:"evidence"`
+	CreatedAt        time.Time          `json:"created_at"`
+	Cleanup          bool               `json:"cleanup"`
+	Synthetic        bool               `json:"synthetic"`
 }
 
 func Properties(operation string, b Binding) []string {
@@ -90,7 +98,17 @@ func Evaluate(q ObservationRequest, facts []Fact, now time.Time, cleanup, fixtur
 			copy := tuple
 			scoped = &copy
 		}
-		for _, property := range q.Required {
+		required := q.Required
+		if len(q.TupleRequired) > 0 {
+			required = q.TupleRequired[hashJSON(tuple)]
+			if len(required) == 0 {
+				a.Missing = append(a.Missing, "tuple_property_scope")
+				if a.Verdict != Violated {
+					a.Verdict = Unverified
+				}
+			}
+		}
+		for _, property := range required {
 			result := PropertyResult{Property: property, Tuple: scoped, State: "missing"}
 			for _, f := range facts {
 				if f.Property != property || !validFact(f, q, now, fixture) || !reflect.DeepEqual(f.Tuple, scoped) {
@@ -186,6 +204,13 @@ func ReadAssessment(dir, id string) (Assessment, error) {
 	return a, e
 }
 func PruneAssessments(dir string, now time.Time) error {
+	info, e := os.Lstat(dir)
+	if os.IsNotExist(e) {
+		return nil
+	}
+	if e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedFile(info) || info.Mode().Perm()&0077 != 0 {
+		return ErrUnsafe
+	}
 	entries, e := os.ReadDir(dir)
 	if os.IsNotExist(e) {
 		return nil

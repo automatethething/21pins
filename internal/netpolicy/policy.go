@@ -37,13 +37,15 @@ type ResolvedTuple struct {
 	Filtering  bool   `json:"filtering"`
 }
 type ObservationRequest struct {
-	Operation string   `json:"operation"`
-	Target    Ref      `json:"target"`
-	Source    Ref      `json:"source"`
-	Objects   []Ref    `json:"objects"`
-	Policies  []Ref    `json:"policies"`
-	Tuples    []Tuple  `json:"tuples"`
-	Required  []string `json:"required_properties"`
+	Operation      string              `json:"operation"`
+	Target         Ref                 `json:"target"`
+	Source         Ref                 `json:"source"`
+	Objects        []Ref               `json:"objects"`
+	Policies       []Ref               `json:"policies"`
+	Tuples         []Tuple             `json:"tuples"`
+	Required       []string            `json:"required_properties"`
+	TupleRequired  map[string][]string `json:"tuple_required_properties,omitempty"`
+	MetadataDigest string              `json:"metadata_digest"`
 }
 
 func hashJSON(v any) string {
@@ -188,15 +190,25 @@ func (r *Registry) ResolveTuples(tuples []Tuple) ([]ResolvedTuple, error) {
 		count := 0
 		var match ResolvedTuple
 		for _, rule := range s.Policies {
-			normalized, e := normalizeRule(s.Objects, rule)
-			if e != nil {
-				continue
-			}
-			for _, scope := range normalized.Tuples {
-				if scope == t {
-					count++
-					match = ResolvedTuple{t, rule.Ref, rule.Decision, rule.Path, rule.FailClosed, rule.Filtering}
+			for _, declared := range rule.Tuples {
+				scope, scopeErr := canonicalTuple(s.Objects, declared)
+				if scopeErr != nil {
+					src, _ := find(s.Objects, Network, declared.Source.ID)
+					endpoint, _ := find(s.Objects, Service, declared.Endpoint.ID)
+					if src.Ref.ID == t.Source.ID && endpoint.Ref.ID == t.Endpoint.ID && declared.Transport == t.Transport && declared.Port == t.Port && declared.Family == t.Family && declared.Mode == t.Mode {
+						return nil, ErrStale
+					}
+					continue
 				}
+				if scope != t {
+					continue
+				}
+				normalized, e := normalizeRule(s.Objects, rule)
+				if e != nil {
+					return nil, e
+				}
+				count++
+				match = ResolvedTuple{t, normalized.Ref, normalized.Decision, normalized.Path, normalized.FailClosed, normalized.Filtering}
 			}
 		}
 		if count != 1 {

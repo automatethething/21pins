@@ -32,25 +32,27 @@ type Ref struct {
 	Revision uint64 `json:"binding_revision"`
 }
 type Binding struct {
-	Namespace   string `json:"namespace,omitempty"`
-	Context     string `json:"context,omitempty"`
-	Interface   string `json:"interface,omitempty"`
-	Ingress     string `json:"ingress,omitempty"`
-	Address     string `json:"address,omitempty"`
-	Peer        string `json:"peer,omitempty"`
-	Target      string `json:"target,omitempty"`
-	Port        uint16 `json:"port,omitempty"`
-	Realm       string `json:"realm,omitempty"`
-	Protocol    string `json:"protocol,omitempty"`
-	Gateway     Ref    `json:"gateway,omitempty"`
-	VPN         Ref    `json:"vpn,omitempty"`
-	Source      Ref    `json:"source,omitempty"`
-	Control     Ref    `json:"control,omitempty"`
-	NftFamily   string `json:"nft_family,omitempty"`
-	NftTable    string `json:"nft_table,omitempty"`
-	NftChain    string `json:"nft_chain,omitempty"`
-	RequirePath bool   `json:"require_path,omitempty"`
-	FailClosed  bool   `json:"fail_closed,omitempty"`
+	Namespace   string   `json:"namespace,omitempty"`
+	Context     string   `json:"context,omitempty"`
+	Interface   string   `json:"interface,omitempty"`
+	Ingress     string   `json:"ingress,omitempty"`
+	Address     string   `json:"address,omitempty"`
+	Peer        string   `json:"peer,omitempty"`
+	Target      string   `json:"target,omitempty"`
+	Port        uint16   `json:"port,omitempty"`
+	Realm       string   `json:"realm,omitempty"`
+	Protocol    string   `json:"protocol,omitempty"`
+	Transports  []string `json:"transports,omitempty"`
+	AccessModes []string `json:"access_modes,omitempty"`
+	Gateway     Ref      `json:"gateway,omitempty"`
+	VPN         Ref      `json:"vpn,omitempty"`
+	Source      Ref      `json:"source,omitempty"`
+	Control     Ref      `json:"control,omitempty"`
+	NftFamily   string   `json:"nft_family,omitempty"`
+	NftTable    string   `json:"nft_table,omitempty"`
+	NftChain    string   `json:"nft_chain,omitempty"`
+	RequirePath bool     `json:"require_path,omitempty"`
+	FailClosed  bool     `json:"fail_closed,omitempty"`
 }
 type Object struct {
 	Ref     Ref     `json:"ref"`
@@ -88,6 +90,18 @@ func validObject(o Object) bool {
 	}
 	if o.Kind == Service && (o.Binding.Target == "" || o.Binding.Port == 0 || o.Binding.Realm == "") {
 		return false
+	}
+	seenModes := map[string]bool{}
+	for _, mode := range o.Binding.AccessModes {
+		if (mode != "direct" && mode != "mediated") || seenModes[mode] {
+			return false
+		}
+		seenModes[mode] = true
+	}
+	for _, transport := range o.Binding.Transports {
+		if transport != "udp" && transport != "tcp" {
+			return false
+		}
 	}
 	if o.Binding.Protocol != "" && o.Binding.Protocol != "wireguard" && o.Binding.Protocol != "dns" {
 		return false

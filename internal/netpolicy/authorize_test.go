@@ -40,6 +40,27 @@ func TestAdmission(t *testing.T) {
 	if e := Authorize(context.Background(), path, grant.ID, req, "network.read", now, func(context.Context) ([]byte, error) { return []byte("ck_sub_other"), nil }); e == nil {
 		t.Fatal("wrong subject")
 	}
+	for name, mutate := range map[string]func(*policy.Grant){
+		"revoked":                      func(g *policy.Grant) { g.Status = policy.GrantStatusRevoked },
+		"zero_cost_missing_capability": func(g *policy.Grant) { g.Pins.Capabilities.Allowed = nil },
+		"wrong_data_class":             func(g *policy.Grant) { g.Pins.DataPolicy.AllowedClasses = []string{"unrelated"} },
+		"wrong_target":                 func(g *policy.Grant) { g.Pins.ExecutionTargets.AllowedTargets = []string{"unrelated"} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := fixtureGrant(req, now)
+			mutate(&g)
+			fixture := map[string]any{"grants": []policy.Grant{g}}
+			raw, _ := json.Marshal(fixture)
+			p := filepath.Join(t.TempDir(), "state.json")
+			os.WriteFile(p, raw, 0600)
+			if Authorize(context.Background(), p, g.ID, req, "network.read", now, actor) == nil {
+				t.Fatal("invalid execution grant admitted")
+			}
+		})
+	}
+	if Authorize(context.Background(), path, grant.ID, req, "network.read", now, func(context.Context) ([]byte, error) { return nil, ErrMissing }) == nil {
+		t.Fatal("missing identity admitted")
+	}
 	after, _ := os.ReadFile(path)
 	if !bytes.Equal(data, after) {
 		t.Fatal("legacy state mutated")

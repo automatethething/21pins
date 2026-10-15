@@ -11,9 +11,22 @@ import (
 	"syscall"
 )
 
+func bindSocketToInterface(name string, raw syscall.RawConn) error {
+	if !nativePattern.MatchString(name) || len(name) > 15 {
+		return ErrInvalid
+	}
+	var bindErr error
+	if raw.Control(func(fd uintptr) {
+		bindErr = syscall.SetsockoptString(int(fd), syscall.SOL_SOCKET, syscall.SO_BINDTODEVICE, name)
+	}) != nil || bindErr != nil {
+		return ErrUnsupported
+	}
+	return nil
+}
+
 func namespacePath(name string) (string, error) {
 	if name == "" {
-		return "/proc/self/ns/net", nil
+		return "/proc/thread-self/ns/net", nil
 	}
 	if !nativePattern.MatchString(name) {
 		return "", ErrInvalid
@@ -29,6 +42,9 @@ func namespaceIdentity(name string) (string, error) {
 	if e != nil {
 		return "", ErrMissing
 	}
+	return namespaceInfoIdentity(info)
+}
+func namespaceInfoIdentity(info os.FileInfo) (string, error) {
 	st, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return "", ErrUnsupported
@@ -78,7 +94,11 @@ func withinNamespace(ctx context.Context, b Binding, fn func() error) error {
 			return
 		}
 		defer target.Close()
-		id, e := namespaceIdentity(b.Namespace)
+		targetInfo, e := target.Stat()
+		id := ""
+		if e == nil {
+			id, e = namespaceInfoIdentity(targetInfo)
+		}
 		if e != nil || id != b.Context {
 			runtime.UnlockOSThread()
 			result <- ErrStale

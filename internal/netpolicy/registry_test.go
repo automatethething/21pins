@@ -46,7 +46,7 @@ func TestRegistryBindings(t *testing.T) {
 	if err = r.Import(strings.NewReader(`{"objects":[],"confirmed_public":true}`)); err == nil {
 		t.Fatal("unknown import field accepted")
 	}
-	if err = r.Import(strings.NewReader(`{"objects":[{"kind":"service","alias":"web","binding":{"target":"<redacted-ip>","confirmed_public":true}}]}`)); err == nil {
+	if err = r.Import(strings.NewReader(fmt.Sprintf(`{"objects":[{"kind":"service","alias":"web","binding":{"target":%q,"port":443,"realm":"public","confirmed_public":true}}]}`, fixtureIP(80)))); err == nil {
 		t.Fatal("forged public confirmation accepted")
 	}
 	after, _ := os.ReadFile(r.Path)

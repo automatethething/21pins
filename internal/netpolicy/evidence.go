@@ -20,21 +20,30 @@ type Capability struct {
 	Scope     []Ref    `json:"scope"`
 	Missing   []string `json:"missing,omitempty"`
 }
+type ObserverWindow struct {
+	Target   Ref       `json:"target"`
+	Start    time.Time `json:"start"`
+	End      time.Time `json:"end"`
+	Complete bool      `json:"complete"`
+}
+
 type Fact struct {
-	ID             string    `json:"evidence_id"`
-	Property       string    `json:"property"`
-	Target         Ref       `json:"target"`
-	Tuple          *Tuple    `json:"tuple,omitempty"`
-	Value          bool      `json:"value"`
-	Scope          []Ref     `json:"object_revisions"`
-	Policies       []Ref     `json:"policy_revisions"`
-	ObservedAt     time.Time `json:"observed_at"`
-	ValidUntil     time.Time `json:"valid_until"`
-	WindowStart    time.Time `json:"window_start,omitempty"`
-	WindowEnd      time.Time `json:"window_end,omitempty"`
-	Assurance      string    `json:"assurance"`
-	RuntimeBinding string    `json:"runtime_binding,omitempty"`
-	validated      bool
+	ID                   string           `json:"evidence_id"`
+	Property             string           `json:"property"`
+	Target               Ref              `json:"target"`
+	Tuple                *Tuple           `json:"tuple,omitempty"`
+	Value                bool             `json:"value"`
+	Scope                []Ref            `json:"object_revisions"`
+	Policies             []Ref            `json:"policy_revisions"`
+	ObservedAt           time.Time        `json:"observed_at"`
+	ValidUntil           time.Time        `json:"valid_until"`
+	WindowStart          time.Time        `json:"window_start,omitempty"`
+	WindowEnd            time.Time        `json:"window_end,omitempty"`
+	Assurance            string           `json:"assurance"`
+	RuntimeBinding       string           `json:"runtime_binding,omitempty"`
+	ObserverWindows      []ObserverWindow `json:"observer_windows,omitempty"`
+	HistoricalAssessment string           `json:"historical_assessment,omitempty"`
+	validated            bool
 }
 
 func newFact(property string, q ObservationRequest, tuple *Tuple, value bool, now time.Time, assurance string) Fact {
@@ -76,6 +85,20 @@ func validFact(f Fact, q ObservationRequest, now time.Time, fixture bool) bool {
 	}
 	if !f.WindowEnd.IsZero() && (f.WindowStart.IsZero() || f.WindowEnd.Before(f.WindowStart) || f.WindowEnd.After(f.ObservedAt)) {
 		return false
+	}
+	for _, window := range f.ObserverWindows {
+		if window.Start.IsZero() || window.End.Before(window.Start) || window.End.After(f.ObservedAt) {
+			return false
+		}
+		found := false
+		for _, ref := range q.Objects {
+			if ref == window.Target {
+				found = true
+			}
+		}
+		if !found {
+			return false
+		}
 	}
 	return true
 }

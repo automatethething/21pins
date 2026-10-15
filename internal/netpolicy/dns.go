@@ -5,10 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"io"
 	"net"
 	"net/netip"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -176,7 +178,7 @@ func probeDNS(ctx context.Context, source Binding, service Binding, transport, d
 		if e != nil || address.Is4() != destination.Is4() {
 			return ErrUnsupported
 		}
-		dialer := net.Dialer{Timeout: 700 * time.Millisecond}
+		dialer := net.Dialer{Timeout: 700 * time.Millisecond, Control: func(_, _ string, raw syscall.RawConn) error { return bindSocketToInterface(source.Interface, raw) }}
 		if transport == "udp" {
 			dialer.LocalAddr = &net.UDPAddr{IP: net.IP(address.AsSlice())}
 		} else if transport == "tcp" {
@@ -186,7 +188,7 @@ func probeDNS(ctx context.Context, source Binding, service Binding, transport, d
 		}
 		connection, e := dialer.DialContext(ctx, transport, netip.AddrPortFrom(destination, service.Port).String())
 		if e != nil {
-			if ctx.Err() != nil {
+			if ctx.Err() != nil || errors.Is(e, ErrUnsupported) || errors.Is(e, syscall.EADDRNOTAVAIL) || errors.Is(e, syscall.EPERM) {
 				return ErrUnsupported
 			}
 			result.silent = true
