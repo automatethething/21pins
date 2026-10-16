@@ -46,14 +46,22 @@ class Journal:
    except FileExistsError:raise ValueError('one boot budget already consumed')
  def records(self):
   records=[]
-  for path in sorted(self.root.glob('*-result.json')):
+  for stage in STAGES+['cleanup']:
+   path=self.path(stage,'result')
+   if not path.exists():continue
    record=json.loads(path.read_text());digest=record.pop('record_sha256')
+   if record.get('stage')!=stage:raise ValueError('checkpoint_stage_mismatch')
    if hashlib.sha256(json.dumps(record,sort_keys=True).encode()).hexdigest()!=digest:raise ValueError('checkpoint_corruption')
    record['record_sha256']=digest;records.append(record)
   return records
  def state(self):
   results=self.records();good=[r for r in results if r['stage']!='cleanup' and r['status']=='PASS'];bad=[r for r in results if r['stage']!='cleanup' and r['status']!='PASS']
-  done={r['stage'] for r in results};pending=[json.loads(p.read_text())['stage'] for p in sorted(self.root.glob('*-started.json')) if json.loads(p.read_text())['stage'] not in done]
+  done={r['stage'] for r in results};pending=[]
+  for stage in STAGES:
+   path=self.path(stage,'started')
+   if path.exists():
+    if json.loads(path.read_text()).get('stage')!=stage:raise ValueError('started_stage_mismatch')
+    if stage not in done:pending.append(stage)
   return {'last_completed':good[-1]['stage'] if good else None,'failed_stage':bad[0]['stage'] if bad else None,'interrupted_stage':pending[0] if pending else None}
  def start(self,stage):
   if stage=='cleanup':return

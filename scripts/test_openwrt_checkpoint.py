@@ -8,6 +8,18 @@ LABSCRIPT=SCRIPT.with_name('openwrt-fw4-lab.py')
 lspec=importlib.util.spec_from_file_location('lab',LABSCRIPT);lab=importlib.util.module_from_spec(lspec);lspec.loader.exec_module(lab)
 
 class Checkpoints(unittest.TestCase):
+ def test_owner_boot_budget_is_shared_across_preboot_journals(self):
+  self.assertTrue(hasattr(lab,'reserve_owner_boot'),'Owner-wide one-boot reservation missing')
+  with tempfile.TemporaryDirectory() as directory:
+   from unittest.mock import patch
+   one=self.journal(pathlib.Path(directory)/'different_parent_one'/'one');two=self.journal(pathlib.Path(directory)/'different_parent_two'/'two')
+   with patch.object(lab,'BOOT_ANCHOR',pathlib.Path(directory)/'canonical'/'one-authorized-boot.json'):
+    lab.reserve_owner_boot(one)
+    with self.assertRaises(FileExistsError):lab.reserve_owner_boot(two)
+ def test_guard_metadata_is_not_a_semantic_started_record(self):
+  with tempfile.TemporaryDirectory() as directory:
+   j=self.journal(directory);fw4.atomic_json(pathlib.Path(directory)/'guard-started.json',{'mode':'cleanup_only','boot_authority':False,'started_utc':fw4.utc()})
+   self.assertIsNone(j.state()['interrupted_stage']);j.start('environment_provenance');j.finish('environment_provenance',{'status':'PASS','reason':'fixture_verified'});self.assertEqual(j.state()['last_completed'],'environment_provenance')
  def test_failed_plumbing_rejects_later_operations_synchronously(self):
   from unittest.mock import patch
   with tempfile.TemporaryDirectory() as directory:

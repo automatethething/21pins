@@ -2,6 +2,7 @@
 """Single-attempt lab plumbing. No firmware boot except the explicit one-use boot mode."""
 import gzip,hashlib,importlib.util,json,os,pathlib,re,shutil,subprocess,sys,tempfile,time,urllib.request,zlib
 ROOT=pathlib.Path(__file__).resolve().parents[1]
+BOOT_ANCHOR=ROOT/'docs/superpowers/reviews/2026-10-16-fw4-owner-approved-boot-token.json'
 spec=importlib.util.spec_from_file_location('fw4',ROOT/'scripts/validate-openwrt-fw4.py');fw4=importlib.util.module_from_spec(spec);spec.loader.exec_module(fw4)
 NAMES={'owned_profile':'21pins-fw4-retry','context':'colima-21pins-fw4-retry','container':'21pins-fw4-retry-lab'}
 IMAGE='openwrt-24.10.4-x86-64-generic-ext4-combined.img.gz'
@@ -137,6 +138,10 @@ def start_guard(config,journal):
  fw4.atomic_json(journal.root/'guard-started.json',{'mode':'cleanup_only','boot_authority':False,'started_utc':fw4.utc()})
  print(json.dumps({'cleanup_guard_started':True,'boot_authority':False}))
 
+def reserve_owner_boot(journal):
+ fw4.atomic_json(BOOT_ANCHOR,{'budget':1,'consumed':True,'consumed_utc':fw4.utc()})
+ journal.reserve_boot()
+
 def operation(mode,config,journal):
  require(not (journal.root/'orchestration-failure.json').exists() and not journal.path('cleanup','result').exists(),'run_closed')
  state=journal.state();require(not state['failed_stage'] and not state['interrupted_stage'],'run_failed_or_interrupted')
@@ -158,7 +163,7 @@ def operation(mode,config,journal):
    run(base+['create','--name',config['container'],'--network','none','21pins-fw4-retry:local','sh','-c','truncate -s 96M /lab/payload.img && mkfs.ext4 -q -d /lab/payload /lab/payload.img && exec python3 /lab/controller.py serve'],10)
    run(base+['cp',str(local/'staging')+'/.',config['container']+':/lab'],40)
   elif mode=='boot':
-   journal.reserve_boot();run(base+['start',config['container']],10)
+   reserve_owner_boot(journal);run(base+['start',config['container']],10)
    run(base+['exec',config['container'],'python3','-c','import pathlib,time;end=time.monotonic()+10\nwhile not pathlib.Path("/lab/control.sock").exists() and time.monotonic()<end:time.sleep(.1)\nassert pathlib.Path("/lab/control.sock").exists()'],12)
    response=json.loads(run(base+['exec',config['container'],'python3','/lab/controller.py','rpc','--action','boot'],100));require(response.get('status')=='ready','boot_not_ready')
    fw4.atomic_json(journal.root/'boot-ready.json',fw4.sanitize(response))

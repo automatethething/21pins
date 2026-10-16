@@ -1,0 +1,5 @@
+## Review
+- Correct: Declared-stage-only journal enumeration prevents `guard-started.json` from becoming a semantic checkpoint; stage identity is verified for started and result records (`scripts/validate-openwrt-fw4.py:49-67`). The real metadata collision is covered (`scripts/test_openwrt_checkpoint.py:16-19`).
+- Correct: Existing failure-stop, durable checkpoint, exact five-file review, source `214aad5` pinning, and native mandatory/negative gate assertions remain intact.
+- Finding: P1, the claimed owner-wide boot budget is scoped only to `journal.root.parent` (`scripts/openwrt-fw4-lab.py:140-142`), while `--journal` accepts any directory (`scripts/openwrt-fw4-lab.py:177`). A new prelaunch journal under a different parent creates a separate anchor and can reserve another boot. The test covers sibling journals only (`scripts/test_openwrt_checkpoint.py:10-15`). Smallest fix: place the anchor at one fixed, canonical retained review location (or reject journals outside that canonical parent), and test journals under different parents.
+- Merge verdict: BLOCK — fix the cross-parent anchor bypass before consuming the remaining authorized boot.
