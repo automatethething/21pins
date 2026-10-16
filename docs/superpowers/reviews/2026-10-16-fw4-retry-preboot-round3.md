@@ -1,0 +1,7 @@
+## Review
+- Correct: `operation()` rejects orchestration failure, completed cleanup, and failed/interrupted journal state before guard or runtime plumbing (`scripts/openwrt-fw4-lab.py:140-144`). The regression test verifies no runner-build command is invoked after an orchestration failure (`scripts/test_openwrt_checkpoint.py:10-19`).
+- Correct: immutable, fsynced host checkpoints and one-use boot reservation remain enforced (`scripts/validate-openwrt-fw4.py:21-76`); review hashes, frozen product source, and staged binary/controller hashes are rechecked before boot (`scripts/openwrt-fw4-lab.py:119-150`).
+- Correct: failure retention is sanitized and cleanup is independent/serialized (`scripts/validate-openwrt-fw4.py:239-305`). Native contradiction results terminate progression through journal state (`scripts/validate-openwrt-fw4.py:55-64`).
+- Correct: native positive, negative, and aggregate controls cover the declared stages, with contract contradictions for unsafe promotion (`internal/netpolicy/openwrt_firmware_integration_test.go:312-435`).
+- No issues found.
+- Merge verdict: APPROVED — safe to consume exactly one boot, contingent on the existing preboot review digest checks succeeding for the five reviewed files.

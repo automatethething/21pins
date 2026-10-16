@@ -1,0 +1,27 @@
+# One checkpointed real-fw4 retry
+
+Owner explicitly authorized **one additional bounded offline attempt**, not another retry loop. Product source remains214aad5. Independent code review is mandatory before reserving/consuming the new boot token. No private device, SSH/login, new authority/trust, fw3 or Tailscale.
+
+## Existing-evidence diagnosis
+
+Local deterministic parsing of the retained controller transcript found the interrupted invocation began2026-10-15T23:21:05.153Z and ended23:21:07.452Z: **2.299 seconds**, not the80/115s configured deadlines. Tool reported137 with no lower-level detail. Container init later reported normal exit0 and no init OOM flag; that does not exclude a separately killed exec process or host/guest OOM. No matching narrow Python/Docker/QEMU crash report was found in the owned diagnostic directory/time window. VM/kernel/cgroup logs were already deleted with the previous lab. There is insufficient evidence to identify the killed process or prove OOM. No raw transcripts/reports are copied.
+
+Confirmed harness defects, independent of the unproven kill cause:80s serial deadline versus90/95s Go deadlines; multiple major gates in one invocation; guest-tmpfs/memory-only final result; missing rebind/member-removal/nonmutation assertions. These—not a speculative adapter defect—are repaired.
+
+## Minimal durability protocol
+
+1. Host journal lives **outside** Colima/containers, in the retained sanitized result directory. Immutable started/result files use fsync on file and directory; committed results cannot be overwritten. One boot-token file is exclusively created and fsynced before the sole launch. No second launch is permitted.
+2. Exactly one named semantic gate runs per invocation. A host `started` checkpoint precedes the command. Native Go results are also fsynced in the guest; the serial controller immediately validates and fsyncs safe frames/replies in its own filesystem. Raw serial remains bounded memory-only.
+3. A gate is **completed only after the host fsyncs its validated result**. The next gate cannot start before that acknowledgement. Host/controller/VM loss can leave the current gate UNKNOWN/UNVERIFIED, never erase earlier committed gates or manufacture a pass.
+4. Stage ordering and terminal failure are enforced. No failed/interrupted stage is automatically resumed. No missing/ambiguous JSON frame or nonzero exit becomes success. Any generic contradiction halts semantic work immediately.
+5. An independent host cleanup-only guard uses bounded explicit leases, no reboot authority or schedule. It recovers only validated safe frames/replies before teardown where available; prior host checkpoints survive even if recovery is impossible. Final cleanup verifies runtime/VM/data/context and local staging removed, preserving the original owner context. Journal/results survive cleanup.
+
+## Scope, budgets and tests
+
+Same official OpenWrt24.10.4 x86/64 image/checksum, same recorded native versions and signed package payloads/indices. Vendor-key validation stays enforced in the isolated guest mirror; no fallback authority/version. Payload disk is read-only, guest explicitly `-nic none`, runner network none, no shared guest folders/agent/network management endpoint.
+
+Deadline nesting: Go context70s < Go test75s < serial90s < RPC100s < host105s < cleanup lease110s. Every individual tool/wait/cleanup checkpoint<=120s. TCG cache64MiB, one emulated CPU, guest768MiB; Go GOMAXPROCS1/GOMEMLIMIT128MiB. These are bounded resource controls, **not a claim that memory was the previous cause**.
+
+Durable checkpoints: environment/provenance; logical/runtime binding; native logical rebind rejection; kernel/UCI nonmutation; stored/runtime separation; scalar membership/removal; classifier/RPDB/mask/priority/prospective path; forwarding/guard with independent guest-only synthetic traffic; foreign-namespace context, unsupported ct-mark, uncalled-chain and unknown-override negatives; negative-controls aggregate; cleanup.
+
+Seventeen fault/contract tests run without OpenWrt: actual SIGKILL, exit137, outer timeout/controller failure, immutable results, uncommitted files, one-use boot token, invalid/private frames, cleanup coordination, stopped-run rejection, exact review coverage, untracked build-input rejection, native stage coverage and cleanup-guard behavior. Preboot reviewer must inspect the journal/controller plus complete native gate assertions and unchanged production source. Round1 blocked launch on four omissions; corrected before any boot: native negative-controls aggregate and command generation; exact five-file review/digest allowlist; module and unexpected product-build-input pinning; explicit guard start/ready receipt and active-guard requirement before runtime creation. Round2 additionally required synchronous rejection of any later plumbing operation after orchestration failure; fixed and regression-tested before launch. A coordinator death closes the run and identifies its stage; cleanup has a separate bounded checkpoint rather than extending a semantic command's outer deadline. After approval, reserve the token and perform only the one attempt. A failed retry reports the last committed checkpoint and exact failed/interrupted stage after full teardown. No further boot or Tailscale work starts.
