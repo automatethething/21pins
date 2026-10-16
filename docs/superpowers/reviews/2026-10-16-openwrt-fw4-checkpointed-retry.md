@@ -2,6 +2,8 @@
 
 **Result: stopped at `negative_context`; firmware/subset acceptance remains UNVERIFIED. No compatibility statement is published.**
 
+**Owner disposition:** accepted as correctly **OWNER_BLOCKED on a generic evidence-provenance defect**, not an OpenWrt exception. The owner authorized a [small generic spec amendment](../specs/2026-10-16-network-context-provenance-design.md) and [implementation plan](../plans/2026-10-16-network-context-provenance-plan.md) only; product edits require separate approval of that pair. No new OpenWrt guest or Tailscale work is authorized.
+
 Exactly **one additional OpenWrt guest boot** was consumed. Product source is unchanged from `214aad5`; no adapter/vendor exception, outcome relaxation, private-device access, SSH/login, trust expansion, fw3 or Tailscale work occurred. The required stop rule was obeyed; no semantic gate followed the contradiction and no further boot is authorized.
 
 ## Durable checkpoint outcome
