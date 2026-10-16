@@ -97,6 +97,8 @@ Outputs are readable JSON (`--json` is accepted explicitly), with friendly sourc
 
 ## Optional OpenWrt evidence adapter — fixture validated
 
+**Controlled firmware stop gate:** the single checkpointed OpenWrt24.10.4 x86/64 retry passed eight recorded prerequisite/positive checkpoints, then failed the foreign-namespace/device-name binding safety requirement. Validation stopped, the lab was removed, and no compatibility statement is published. System ubus provenance must not be treated as proof for another namespace. Product source remains unchanged pending separately scoped generic-contract review; see the [precise result and evidence limits](superpowers/reviews/2026-10-16-openwrt-fw4-checkpointed-retry.md).
+
 The same `gateway` / `network` objects can now carry optional `openwrt` native selectors; GL.iNet is a capability-specific OpenWrt profile, not another public object. Profiles `fw4-basic` and `gl-policy-fw4` are reader hints only. Actual runtime must match the finite supported subset. **Live OpenWrt/GL.iNet firmware compatibility remains UNVERIFIED.** fw3/iptables and Tailscale are not implemented.
 
 Gateway selectors bind a logical network, exact family/table/chain roles and expected hook/priority, at most one scalar IPv4 destination set and named non-secret stored firewall sections. A source network can carry only its logical-network name plus its existing gateway reference. Binding selectors are canonical deep-owned snapshots; friendly names are not authority, rebinding invalidates evidence, and native source/client/router namespaces stay distinct. Omitted selectors retain existing Linux JSON/digests.
