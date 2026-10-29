@@ -4,6 +4,12 @@ Give an AI agent temporary SSH access without giving it permanent credentials.
 
 **The authorization can last hours while the underlying SSH credentials last minutes and renew automatically.**
 
+## Controlled-beta release boundary
+
+SSH is beta-only until operators verify the production agent-CA profile, target command gate, effective sshd environment restrictions, CA backup/rotation, revocation response, and recovery access on a non-production target. Do not expose the issuer or target broadly, enroll unreviewed users or hosts, or use `--dev`/`--legacy-auth-only` in production. Lease completion, certificate expiry, and revocation do not force-terminate established sessions or detached remote work; immediate containment requires target-side session/process controls.
+
+Incident response: stop issuance and renewal, revoke affected app credentials and leases, rotate the CA after suspected key/state compromise, verify old-certificate denial on a fresh connection, preserve root-only recovery access, and record residual validity for already-issued certificates and established sessions. Require two-person review for production CA rotation, trust changes, and role-policy changes. Never claim instantaneous revocation.
+
 ## Architecture
 
 21pins is the authorization/credential-lifecycle control plane. The client creates one ephemeral Ed25519 key per lease and submits only the public key. A workspace-specific CA signs short-lived native OpenSSH user certificates. SSH connects directly from client to host; no traffic, commands, environment, keystrokes or terminal recording passes through the authorization API. There is no Wafers integration, SSH proxy, target daemon or target callback.

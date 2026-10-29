@@ -136,6 +136,49 @@ func TestGatewayPolicyAllowsAndRecordsReceipt(t *testing.T) {
 	}
 }
 
+func TestGatewayReturnsPaymentRequiredWhenBudgetExceeded(t *testing.T) {
+	called := false
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer upstream.Close()
+
+	s, err := store.New(filepath.Join(t.TempDir(), "state.json"))
+	if err != nil {
+		t.Fatalf("store.New failed: %v", err)
+	}
+	_ = s.SetProviderKey("openai", "provider-key")
+	grant := createGatewayGrant(t, s, "openai")
+	if err := s.AddGrantSpend(grant.ID, 995); err != nil {
+		t.Fatalf("AddGrantSpend failed: %v", err)
+	}
+	appToken, err := s.CreateToken("web", []string{"proxy:chat"})
+	if err != nil {
+		t.Fatalf("CreateToken failed: %v", err)
+	}
+
+	g := NewServer(s, Config{Port: 0, OpenAIBaseURL: upstream.URL})
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewBufferString(`{"model":"openai/gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Authorization", "Bearer "+appToken)
+	req.Header.Set("Content-Type", "application/json")
+	addPolicyHeaders(req, grant.ID)
+	w := httptest.NewRecorder()
+	g.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusPaymentRequired {
+		t.Fatalf("expected 402, got %d body=%s", w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("X-21Pins-Payment-Reason"); got != "budget_exceeded" {
+		t.Fatalf("unexpected payment reason: %q", got)
+	}
+	if got := w.Header().Get("Link"); got != `</v1/usage>; rel="usage", </v1/chat/completions>; rel="payment"` {
+		t.Fatalf("unexpected payment links: %q", got)
+	}
+	if called {
+		t.Fatal("upstream was called after budget denial")
+	}
+}
+
 func TestGatewayPolicyBlocksDisallowedTargetBeforeForwarding(t *testing.T) {
 	called := false
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

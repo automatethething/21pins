@@ -14,11 +14,11 @@
 - [x] Manual approval flow (`approvals list/get/approve/reject`)
 - [x] Pin 7 enforcement gate (`--approval-id` required for threshold-crossing actions)
 
-### Phase 3 (next)
-- [ ] Delegation chain semantics (Pin 2 real enforcement)
-- [ ] CK CLI identity handoff in grant issuance UX
-- [ ] Gateway middleware policy checks on execution path
-- [ ] Hosted control plane mode
+### Phase 3 (in progress)
+- [x] Delegation chain semantics (Pin 2 real enforcement)
+- [x] CK CLI identity handoff in grant issuance UX
+- [x] Gateway middleware policy checks on execution path
+- [x] Hosted ConsentKeys attestation control-plane mode
 - [ ] L402/payment integration for spend enforcement
 
 ## Security / Signing Roadmap

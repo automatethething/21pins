@@ -1,8 +1,8 @@
 # Generic network context provenance implementation plan
 
-> **For agentic workers:** use @superpowers:executing-plans (one writer) or separately authorized @superpowers:subagent-driven-development. **PLAN ONLY: stop for owner approval before product/test implementation. No OpenWrt guest or Tailscale.**
+> **For agentic workers:** use @superpowers:executing-plans with exactly one writer in an isolated worktree. **IMPLEMENTATION AUTHORIZED by the owner's “Finish 21pins please” directive. No OpenWrt guest or Tailscale.**
 
-**Review:** independently APPROVED round2 — [review record](../reviews/2026-10-16-network-context-provenance-review.md). **Owner implementation approval PENDING.**
+**Review:** independently APPROVED round2 — [review record](../reviews/2026-10-16-network-context-provenance-review.md). **Owner implementation approval RECORDED; complete Tasks 1–5 without expanding scope.**
 
 **Goal:** prevent execution context from laundering control-plane/configuration observations into runtime facts for a different registered dataplane context.
 
@@ -18,7 +18,7 @@ New: `internal/netpolicy/provenance.go`, `provenance_test.go`, `provenance_linux
 
 Product documentation scope: `docs/network-verification.md`, README limitation paragraph, this plan/spec/review only. LLM proxy, execution grants/CK identity, SSH, signed legacy receipts and existing operational hosts remain untouched.
 
-Administrative planning handoff only (not a runtime/implementation feature): governing workspace instructions require the existing Flowstate PRD/portfolio/manifest and exact-path approval queue to reflect the planning/owner-blocked state. This session performs that metadata bookkeeping; it neither broadens `internal/netpolicy` implementation scope nor authorizes product edits.
+Administrative handoff only (not a runtime/implementation feature): governing workspace instructions require the existing Flowstate PRD/portfolio/manifest to reflect material implementation reality. Update those records only after verified milestones; this does not broaden `internal/netpolicy` scope.
 
 ## Task 1 — sealed observation/fact context contract
 
@@ -72,8 +72,6 @@ Administrative planning handoff only (not a runtime/implementation feature): gov
 - [ ] Independently review the generic provenance/eligibility and adapter/dependency migration; one writer fixes findings, then reruns affected gates. Inspect exact CWD fleet/sessions and verify complete owned-runner/temp/namespace/socket cleanup before closure.
 - [ ] Document source-scoped success versus candidate/UNVERIFIED, persisted unsigned baseline limits and known fw4 stop; preserve endpoint suppression and existing signed authority. No firmware-support assertion, Tailscale work or fw4 boot follows automatically.
 
-## Owner approval boundary
+## Authorization boundary
 
-This planning session may write/review/commit only the spec, this plan, review records and required dashboard/portfolio metadata. **Stop OWNER_BLOCKED before any Task1 code/test edits.**
-
-Owner approval phrase: **`Approve generic context-provenance implementation`**. It authorizes only this reviewed generic implementation/regression scope; it does not authorize another OpenWrt guest, real router/device access, credentials/trust, a production mapping resolver, fw3 or Tailscale. A firmware revalidation proposal may be considered only after the generic fix is implemented and independently verified, and still requires a separately explicit boot budget.
+The owner's “Finish 21pins please” directive authorizes Tasks 1–5 as reversible local development and verification work. It does **not** authorize another OpenWrt guest, real router/device access, credentials/trust changes, deployment, a production mapping resolver, fw3, Tailscale, or a public compatibility claim. A firmware revalidation proposal may be considered only after the generic fix is independently verified and still requires a separately explicit boot budget.

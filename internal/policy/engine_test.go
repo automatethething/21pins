@@ -113,6 +113,34 @@ func TestEvaluateBlockWhenAuthorityLeafMismatch(t *testing.T) {
 	}
 }
 
+func TestEvaluateBlockWhenDelegatorMissingFromAuthorityChain(t *testing.T) {
+	now := time.Now().UTC()
+	g := Grant{ID: "grt_123", Sub: "ck_sub_agent", DelegatedBy: "ck_sub_owner", Status: GrantStatusActive, Pins: Pins{
+		Identity: IdentityPin{Sub: "ck_sub_agent"}, Authority: AuthorityPin{Chain: []string{"ck_sub_other", "ck_sub_agent"}},
+		Capabilities: CapabilityPin{Allowed: []string{"llm.chat"}}, DataPolicy: DataPolicyPin{AllowedClasses: []string{"public"}},
+		SpendPolicy:      SpendPolicyPin{LimitCents: 1000, WindowStart: now.Add(-time.Hour), WindowEnd: now.Add(time.Hour)},
+		ExecutionTargets: ExecutionTargetPin{AllowedTargets: []string{"openrouter"}},
+	}}
+	res := EvaluateAction(g, ActionRequest{GrantID: g.ID, Sub: g.Sub, Capability: "llm.chat", DataClass: "public", Target: "openrouter"}, now)
+	if res.Decision != DecisionBlock || res.PinStates["authority_chain"] != PinFail {
+		t.Fatalf("expected delegation chain block, got decision=%s pin=%s", res.Decision, res.PinStates["authority_chain"])
+	}
+}
+
+func TestEvaluateAllowsDelegatorInAuthorityChain(t *testing.T) {
+	now := time.Now().UTC()
+	g := Grant{ID: "grt_123", Sub: "ck_sub_agent", DelegatedBy: "ck_sub_owner", Status: GrantStatusActive, Pins: Pins{
+		Identity: IdentityPin{Sub: "ck_sub_agent"}, Authority: AuthorityPin{Chain: []string{"ck_sub_owner", "ck_sub_agent"}},
+		Capabilities: CapabilityPin{Allowed: []string{"llm.chat"}}, DataPolicy: DataPolicyPin{AllowedClasses: []string{"public"}},
+		SpendPolicy:      SpendPolicyPin{LimitCents: 1000, WindowStart: now.Add(-time.Hour), WindowEnd: now.Add(time.Hour)},
+		ExecutionTargets: ExecutionTargetPin{AllowedTargets: []string{"openrouter"}},
+	}}
+	res := EvaluateAction(g, ActionRequest{GrantID: g.ID, Sub: g.Sub, Capability: "llm.chat", DataClass: "public", Target: "openrouter"}, now)
+	if res.Decision != DecisionAllow {
+		t.Fatalf("expected delegated grant allow, got %s (%v)", res.Decision, res.Reasons)
+	}
+}
+
 func TestEvaluateBlockOnRevokedGrant(t *testing.T) {
 	now := time.Now().UTC()
 	g := Grant{ID: "grt_123", Sub: "ck_sub_abc", Status: GrantStatusRevoked}

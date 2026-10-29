@@ -1,6 +1,6 @@
 # Amendment: generic network evidence context provenance
 
-**Status: independently APPROVED round2; design only, implementation requires owner approval.** [Review](../reviews/2026-10-16-network-context-provenance-review.md). The owner accepts the real-fw4 result as **OWNER_BLOCKED on a generic provenance defect**, not a vendor exception. No product source, OpenWrt guest, boot budget, Tailscale, authority or credential change is authorized by this amendment.
+**Status: independently APPROVED round2; implementation authorized by the owner's “Finish 21pins please” directive.** [Review](../reviews/2026-10-16-network-context-provenance-review.md). The authorization covers the reviewed generic implementation and regression scope only. No OpenWrt guest, boot budget, Tailscale, production mapping resolver, authority, credential, deployment, or public support claim is authorized by this amendment.
 
 Baseline: existing product code `214aad5`, current report `3769fe5`; [controlled result](../reviews/2026-10-16-openwrt-fw4-checkpointed-retry.md). Its failed composite binding/UNVERIFIED condition is sufficient to require this safety correction; the report does not invent separately unretained component verdicts.
 

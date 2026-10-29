@@ -2,6 +2,8 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
+    { "source": "/ingest/static/:path*", "destination": "https://logs.petrichorlabs.ca/static/:path*" },
+    { "source": "/ingest/:path*", "destination": "https://logs.petrichorlabs.ca/:path*" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/v1/ck/attestation-sessions", "destination": "/api/v1/ck/attestation-sessions" },
     { "source": "/v1/ck/attestation-sessions/:id", "destination": "/api/v1/ck/attestation-sessions/:id" },

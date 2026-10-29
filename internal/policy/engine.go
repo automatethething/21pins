@@ -27,6 +27,9 @@ func EvaluateAction(grant Grant, req ActionRequest, now time.Time) EvaluationRes
 		if leaf == "" || !strings.EqualFold(leaf, req.Sub) {
 			pinStates["authority_chain"] = PinFail
 			reasons["authority_chain"] = "authority leaf does not match acting subject"
+		} else if grant.DelegatedBy != "" && !contains(grant.Pins.Authority.Chain, grant.DelegatedBy) {
+			pinStates["authority_chain"] = PinFail
+			reasons["authority_chain"] = "delegator is not present in authority chain"
 		} else {
 			pinStates["authority_chain"] = PinPass
 		}

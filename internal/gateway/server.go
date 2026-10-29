@@ -376,8 +376,16 @@ func (s *Server) enforcePolicy(w http.ResponseWriter, r *http.Request, target st
 		return true, receipt.ID
 	}
 	status := http.StatusForbidden
+	headers := map[string]string{}
 	if result.Decision == policy.DecisionRequireApproval {
 		status = http.StatusPreconditionRequired
+	} else if result.PinStates["spend_policy"] == policy.PinFail && result.Reasons["spend_policy"] == "budget exceeded" {
+		status = http.StatusPaymentRequired
+		headers["Link"] = "</v1/usage>; rel=\"usage\", </v1/chat/completions>; rel=\"payment\""
+		headers["X-21Pins-Payment-Reason"] = "budget_exceeded"
+	}
+	for key, value := range headers {
+		w.Header().Set(key, value)
 	}
 	writeJSON(w, status, map[string]any{
 		"error":      "policy denied request",
